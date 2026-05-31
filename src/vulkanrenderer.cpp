@@ -31,6 +31,7 @@ bool VulkanRenderer::initialize()
         createLogicalDevice();
         createCommandPools();
         createSwapChain();
+        createDescriptorSetLayout();
     } catch (const std::runtime_error& e) {
         printDebugInfo(e.what());
         succeded = false;
@@ -42,8 +43,19 @@ bool VulkanRenderer::initialize()
 void VulkanRenderer::cleanup()
 {
     Q_ASSERT(m_pDeviceFunctions != VK_NULL_HANDLE);
+
+    // Wait until Idle status
     m_pDeviceFunctions->vkDeviceWaitIdle(m_logicalDevice);
 
+    // Destroy descriptor set layout
+    {
+        auto* vkDestroyDescriptorSetLayout = (PFN_vkDestroyDescriptorSetLayout)(m_vulkanInstance.getInstanceProcAddr("vkDestroyDescriptorSetLayout"));
+        Q_ASSERT(vkDestroyDescriptorSetLayout != nullptr);
+        if (m_descriptorSetLayout != VK_NULL_HANDLE) {
+            vkDestroyDescriptorSetLayout(m_logicalDevice, m_descriptorSetLayout, nullptr);
+            m_descriptorSetLayout = VK_NULL_HANDLE;
+        }
+    }
 
     // Destroy command pools
     {
@@ -257,7 +269,7 @@ void VulkanRenderer::createLogicalDevice()
 
     VkPhysicalDeviceVulkan13Features enabledFeatures13{};
     enabledFeatures13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
-    enabledFeatures13.dynamicRendering = VK_TRUE;
+    enabledFeatures13.dynamicRendering = VK_TRUE; // Enable Dynamic Rendering
     enabledFeatures13.synchronization2 = VK_TRUE;
 
     // QUEUE FAMILIY
@@ -511,6 +523,34 @@ void VulkanRenderer::createSwapChain()
 
         m_swapchainImages.push_back(swapchainImage);
     }
+}
+
+void VulkanRenderer::createDescriptorSetLayout()
+{
+    // CREATE UNIFORM BUFFER DESCRIPTOR SET LAYOUT
+    // uboModelViewProjection binding info
+    VkDescriptorSetLayoutBinding uboModelViewProjectionLayoutBinding{};
+    uboModelViewProjectionLayoutBinding.binding = 0;                                         // Binding point in shader (designated by binding number in shader)
+    uboModelViewProjectionLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;  // Type of descriptor (uniform buffer, image sampler, etc)
+    uboModelViewProjectionLayoutBinding.descriptorCount = 1;								    // Number of descriptors for binding, only 1 in this case, but could be more with arrays of descriptors in shader
+    uboModelViewProjectionLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;			    // Shader stage to bind descriptor to (vertex shader in this case since uboViewProjection matrix is used in vertex shader)
+    uboModelViewProjectionLayoutBinding.pImmutableSamplers = nullptr;						// For image sampling, can specify if sampler is immutable (can't be changed) and give a sampler, but not used in this case
+
+    // std::vector<VkDescriptorSetLayoutBinding> layoutBindings = { uboViewProjectionLayoutBinding, uboModelLayoutBinding };
+    std::vector<VkDescriptorSetLayoutBinding> layoutBindings = { uboModelViewProjectionLayoutBinding };
+
+    // Create Descriptor Set Layout with given bindings
+    VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{};
+    descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    descriptorSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(layoutBindings.size()); // Number of bindings in the layout
+    descriptorSetLayoutCreateInfo.pBindings = layoutBindings.data();                           // List of bindings (only one in this case)
+    descriptorSetLayoutCreateInfo.flags = 0;                                                   // Optional flags for the layout (e.g. update after bind pool)
+    descriptorSetLayoutCreateInfo.pNext = nullptr;                                             // Optional pointer to extend functionality of layout creation (e.g. for push descriptors)
+
+    // Create Descriptor Set Layout
+    Q_ASSERT(m_pDeviceFunctions != nullptr);
+    VkResult result = m_pDeviceFunctions->vkCreateDescriptorSetLayout(m_logicalDevice, &descriptorSetLayoutCreateInfo, nullptr, &m_descriptorSetLayout);
+    if (result != VK_SUCCESS) throw std::runtime_error("Failed to create Descriptor Set Layout");
 }
 
 void VulkanRenderer::printVulkanInfo(const QString &iString) const

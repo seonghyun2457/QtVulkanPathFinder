@@ -39,6 +39,7 @@ private:
     void createCommandPools();
     VkCommandPool createCommandPool(const uint32_t iQueueFamilyIndex);
     void createSwapChain();
+    void createDescriptorSetLayout();
 
     // Print information
     void printVulkanInfo(const QString& iString) const;
@@ -106,6 +107,9 @@ private:
     VkCommandPool m_graphicsCommandPool{VK_NULL_HANDLE};
     VkCommandPool m_computeCommandPool{VK_NULL_HANDLE};
     VkCommandPool m_transferCommandPool{VK_NULL_HANDLE};
+
+    // - Descriptor Set Layout
+    VkDescriptorSetLayout m_descriptorSetLayout{VK_NULL_HANDLE};
 
     // SUPPORT
     // - Pointer to functions
