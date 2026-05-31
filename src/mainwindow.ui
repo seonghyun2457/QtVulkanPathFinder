@@ -53,7 +53,7 @@
     <item>
      <widget class="QTabWidget" name="tabInfo">
       <property name="currentIndex">
-       <number>0</number>
+       <number>1</number>
       </property>
       <widget class="QPlainTextEdit" name="vulkanInfo">
        <attribute name="title">

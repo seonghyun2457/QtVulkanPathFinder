@@ -30,6 +30,12 @@ void MainWindow::displayDebugInfo(const QString &iDebugInfo)
     m_ui->debugLog->appendPlainText(iDebugInfo);
 }
 
+void MainWindow::onMousePressed(Qt::MouseButton button, const QPointF &position)
+{
+    QString msg = QString("%1 button clicked at (%2, %3)").arg(button).arg(position.x()).arg(position.y());
+    displayDebugInfo(msg);
+}
+
 
 void MainWindow::initializeVulkanWidget()
 {
@@ -39,8 +45,12 @@ void MainWindow::initializeVulkanWidget()
     }
 
     // CONNECT
+    // - Logging
     connect(m_pVulkanWidget, &VulkanWidget::sendVulkanInfo, this, &MainWindow::displayVulkanInfo);
     connect(m_pVulkanWidget, &VulkanWidget::sendDebugInfo, this, &MainWindow::displayDebugInfo);
+
+    // - Mouse events
+    connect(m_pVulkanWidget,  &VulkanWidget::mousePressed, this, &MainWindow::onMousePressed);
 
     qDebug() << "m_pVulkanWidget->width(): " << m_pVulkanWidget->width();
     qDebug() << "m_pVulkanWidget->height(): " << m_pVulkanWidget->height();
@@ -53,7 +63,7 @@ void MainWindow::initializeVulkanWidget()
 
     // Window Container
     QWidget* pWindowContainer = QWidget::createWindowContainer(m_pVulkanWidget, m_ui->vulkanWindow->parentWidget());
-    pWindowContainer->setMouseTracking(true);
+    //pWindowContainer->setMouseTracking(true);
     pWindowContainer->setSizePolicy(m_ui->vulkanWindow->sizePolicy());
     pWindowContainer->setMinimumSize(m_ui->vulkanWindow->minimumSize());
 

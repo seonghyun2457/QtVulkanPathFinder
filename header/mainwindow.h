@@ -20,9 +20,12 @@ public:
     virtual ~MainWindow();
 
 private slots:
+    // Logging slot
     void displayVulkanInfo(const QString& iVulkanInfo);
     void displayDebugInfo(const QString& iDebugInfo);
 
+    // Mouse event slot
+    void onMousePressed(Qt::MouseButton button, const QPointF& position);
 private:
     void initializeVulkanWidget();
 

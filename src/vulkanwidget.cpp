@@ -8,6 +8,9 @@ VulkanWidget::VulkanWidget()
     , m_pVulkanRenderer(nullptr)
 {
     setSurfaceType(QWindow::VulkanSurface);
+
+    // Disable mouseMoveEvent
+    setMouseGrabEnabled(false);
 }
 
 VulkanWidget::~VulkanWidget()
@@ -31,7 +34,7 @@ void VulkanWidget::exposeEvent(QExposeEvent* event)
     QWindow::exposeEvent(event);
 }
 
-bool VulkanWidget::event(QEvent *e)
+bool VulkanWidget::event(QEvent* e)
 {
     if (e->type() == QEvent::PlatformSurface) {
         auto* surfaceEvent = static_cast<QPlatformSurfaceEvent*>(e);
@@ -47,13 +50,25 @@ bool VulkanWidget::event(QEvent *e)
     return QWindow::event(e);
 }
 
-void VulkanWidget::resizeEvent(QResizeEvent *event)
+void VulkanWidget::resizeEvent(QResizeEvent* event)
 {
     if (m_initisialized && m_pVulkanRenderer != nullptr) {
         m_pVulkanRenderer->recreateSwapChain();
     }
 
     QWindow::resizeEvent(event);
+}
+
+void VulkanWidget::mousePressEvent(QMouseEvent* event)
+{
+    emit mousePressed(event->button(), event->position());
+    QWindow::mousePressEvent(event);
+}
+
+void VulkanWidget::mouseMoveEvent(QMouseEvent* event)
+{
+    emit mouseMoved(event->position());
+    QWindow::mouseMoveEvent(event);
 }
 
 void VulkanWidget::initializeRenderer()
