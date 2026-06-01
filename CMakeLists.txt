@@ -9,6 +9,9 @@ file(GLOB HEADERS "header/*.h")
 file(GLOB SOURCES "src/*.cpp")
 file(GLOB UI_FILES "src/*.ui")
 
+#Add glm
+add_subdirectory(externals/glm)
+
 find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets Gui)
 
 qt_standard_project_setup()
@@ -25,7 +28,10 @@ target_link_libraries(${PROJECT_NAME}
         Qt::Core
         Qt6::Widgets
         Qt6::Gui
+        glm
 )
+
+target_include_directories(${PROJECT_NAME} PUBLIC "${PROJECT_SOURCE_DIR}/externals/glm")
 
 include(GNUInstallDirs)
 
