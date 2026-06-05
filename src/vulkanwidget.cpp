@@ -28,7 +28,7 @@ void VulkanWidget::exposeEvent(QExposeEvent* event)
     }
 
     if (isExposed()) {
-        // draw();
+        draw();
     }
 
     QWindow::exposeEvent(event);
@@ -36,6 +36,11 @@ void VulkanWidget::exposeEvent(QExposeEvent* event)
 
 bool VulkanWidget::event(QEvent* e)
 {
+    if (e->type() == QEvent::UpdateRequest) {
+        draw();
+        return true;
+    }
+
     if (e->type() == QEvent::PlatformSurface) {
         auto* surfaceEvent = static_cast<QPlatformSurfaceEvent*>(e);
 
@@ -91,6 +96,15 @@ void VulkanWidget::initializeRenderer()
 void VulkanWidget::draw()
 {
     emit sendDebugInfo("draw");
+
+    if (m_pVulkanRenderer && m_initisialized) {
+        m_pVulkanRenderer->draw();
+    }
+
+
+    if (isExposed()) {
+        requestUpdate();
+    }
 
 }
 

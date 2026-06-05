@@ -215,6 +215,11 @@ void VulkanRenderer::recreateSwapChain()
     }
 }
 
+void VulkanRenderer::draw()
+{
+    printDebugInfo("draw");
+}
+
 void VulkanRenderer::createInstance()
 {
     printDebugInfo("Create Instance");

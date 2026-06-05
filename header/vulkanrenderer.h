@@ -44,6 +44,8 @@ public:
     void cleanup();
 
     void recreateSwapChain();
+
+    void draw();
 private:
     void createInstance();
     void createSurface();
