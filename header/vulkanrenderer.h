@@ -72,6 +72,8 @@ private:
     const uint32_t findMemoryTypeIndex(const VkPhysicalDevice iPhysicalDevice, const uint32_t allowdedTypes, const VkMemoryPropertyFlags properties);
     void createDescriptorPool();
     void createDescriptorSets();
+
+    // Synchronization
     void createSynchronization();
 
     // Print information
@@ -136,10 +138,6 @@ private:
     VkQueue m_computeQueue{VK_NULL_HANDLE};
     VkQueue m_transferQueue{VK_NULL_HANDLE};
 
-    // - Descriptor Set Layout
-    VkDescriptorSetLayout m_descriptorSetLayout{VK_NULL_HANDLE};
-
-
     // Graphics Pipeline
     VkPipelineLayout m_pipelineLayout{VK_NULL_HANDLE};
     VkPipeline m_pipeline{VK_NULL_HANDLE};
@@ -155,6 +153,15 @@ private:
     // - Uniform buffer
     std::vector<VkBuffer> m_uboModelViewProjectionBuffers;
     std::vector<VkDeviceMemory> m_uboModelViewProjectionBuffersMemory;
+
+    // - Descriptor pool
+    VkDescriptorPool m_descriptorPool{VK_NULL_HANDLE};
+
+    // - Descriptor Set Layout
+    VkDescriptorSetLayout m_descriptorSetLayout{VK_NULL_HANDLE};
+
+    // - Descriptor sets
+    std::vector<VkDescriptorSet> m_descriptorSets;
 
 
     // - Synchronizaiton resources

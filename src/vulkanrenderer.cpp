@@ -66,6 +66,11 @@ void VulkanRenderer::cleanup()
     // Wait until Idle status
     m_pDeviceFunctions->vkDeviceWaitIdle(m_logicalDevice);
 
+    // Destroy descriptor pool
+    if (m_descriptorPool != VK_NULL_HANDLE) {
+        m_pDeviceFunctions->vkDestroyDescriptorPool(m_logicalDevice, m_descriptorPool, nullptr);
+        m_descriptorPool = VK_NULL_HANDLE;
+    }
 
     // Destroy uniform buffers
     {
@@ -631,11 +636,76 @@ const uint32_t VulkanRenderer::findMemoryTypeIndex(const VkPhysicalDevice iPhysi
 void VulkanRenderer::createDescriptorPool()
 {
     printDebugInfo("Create Descriptor pool");
+
+    Q_ASSERT(m_pDeviceFunctions != nullptr);
+
+    // CREATE UNIFORM BUFFER DESCRIPTOR POOL
+    // Type of descriptor + how many Descriptoprs, not Descriptor Sets (combined makes the pool size)
+    VkDescriptorPoolSize modelViewProjectionDescriptorPoolSize{};
+    modelViewProjectionDescriptorPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;                                         // Type of descriptor (uniform buffer, image sampler, etc)
+    modelViewProjectionDescriptorPoolSize.descriptorCount = static_cast<uint32_t>(m_uboModelViewProjectionBuffers.size());  // Number of descriptor of this type
+
+    // List of descriptor pool sizes
+    std::vector<VkDescriptorPoolSize> descriptorPoolSizes = {modelViewProjectionDescriptorPoolSize};
+
+    // Descriptor pool creation information
+    VkDescriptorPoolCreateInfo modelViewProjectionDescriptorPoolCreateInfo{};
+    modelViewProjectionDescriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;              // Type of the structures
+    modelViewProjectionDescriptorPoolCreateInfo.maxSets = static_cast<uint32_t>(m_swapchainImages.size());          // Maximum number of descriptor sets that can be allocated from pool
+    modelViewProjectionDescriptorPoolCreateInfo.poolSizeCount = static_cast<uint32_t>(descriptorPoolSizes.size());  // Amount of pool sizes being passed
+    modelViewProjectionDescriptorPoolCreateInfo.pPoolSizes = descriptorPoolSizes.data();                            // Pool sizes to create pool with
+
+    // Create Descriptor pool
+    VkResult result = m_pDeviceFunctions->vkCreateDescriptorPool(m_logicalDevice, &modelViewProjectionDescriptorPoolCreateInfo, nullptr, &m_descriptorPool);
+    if (result != VK_SUCCESS) throw std::runtime_error("Failed to create Descriptor pool");
 }
 
 void VulkanRenderer::createDescriptorSets()
 {
     printDebugInfo("Create Descriptor sets");
+
+    Q_ASSERT(m_pDeviceFunctions != nullptr);
+
+    // Resize descriptor sets so one for every unifrom buffer
+    m_descriptorSets.resize(m_swapchainImages.size());
+
+    std::vector<VkDescriptorSetLayout> descriptorSetLayouts(m_swapchainImages.size(), m_descriptorSetLayout);
+
+    // Descriptor set allocation information
+    VkDescriptorSetAllocateInfo descriptorSetAllocateinfo{};
+    descriptorSetAllocateinfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    descriptorSetAllocateinfo.descriptorPool = m_descriptorPool;                                     // Pool to allocate Descriptor sets from
+    descriptorSetAllocateinfo.descriptorSetCount = static_cast<uint32_t>(m_swapchainImages.size());  // Number of descriptor sets to allocate
+    descriptorSetAllocateinfo.pSetLayouts = descriptorSetLayouts.data();                             // Layouts to use for each allocated set
+
+    VkResult result = m_pDeviceFunctions->vkAllocateDescriptorSets(m_logicalDevice, &descriptorSetAllocateinfo, m_descriptorSets.data());
+    if (result != VK_SUCCESS) throw std::runtime_error("Failed to create Descriptor sets");
+
+    // Update descritor sets with buffer bindings
+    for (size_t i = 0; i < m_swapchainImages.size(); ++i) {
+        // UBO modelViewProejction descriptor
+        VkDescriptorBufferInfo modelViewProjectionUniformBufferInfo{};
+
+        modelViewProjectionUniformBufferInfo.buffer = m_uboModelViewProjectionBuffers[i];  // Buffer to bind to descriptor set
+        modelViewProjectionUniformBufferInfo.offset = 0;                                   // Offset in buffer to start of data
+        modelViewProjectionUniformBufferInfo.range = sizeof(UboModelViewProjection);       // Size of data to bind
+
+        // Data about connection between buffer and binding in shader
+        VkWriteDescriptorSet modelViewProjectionUniformBufferWriteDescriptorSet{};
+        modelViewProjectionUniformBufferWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        modelViewProjectionUniformBufferWriteDescriptorSet.dstSet = m_descriptorSets[i];                        // Descriptor set to write to
+        modelViewProjectionUniformBufferWriteDescriptorSet.dstBinding = 0;                                      // Binding in shader where data will be read
+        modelViewProjectionUniformBufferWriteDescriptorSet.dstArrayElement = 0;                                 // Index in array to write to
+        modelViewProjectionUniformBufferWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;  // Type of descriptor
+        modelViewProjectionUniformBufferWriteDescriptorSet.descriptorCount = 1;                                 // Number of descriptors t write
+        modelViewProjectionUniformBufferWriteDescriptorSet.pBufferInfo = &modelViewProjectionUniformBufferInfo; // Buffer info
+
+        // List of write descriptor sets
+        std::vector<VkWriteDescriptorSet> writeDescriptorSets = {modelViewProjectionUniformBufferWriteDescriptorSet};
+
+        // Update the descriptor set with new buffer/binding info
+        m_pDeviceFunctions->vkUpdateDescriptorSets(m_logicalDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+    }
 }
 
 void VulkanRenderer::createSwapChain()
