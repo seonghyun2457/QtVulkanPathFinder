@@ -4,8 +4,15 @@ project(QtVulkanTSP LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Add shaders directory
+include_directories(shaders)
+file(GLOB SHADERS "shaders/shader.*")
+
+# Add header directory
 include_directories(header)
 file(GLOB HEADERS "header/*.h")
+
+# Add src directory
 file(GLOB SOURCES "src/*.cpp")
 file(GLOB UI_FILES "src/*.ui")
 
@@ -21,6 +28,7 @@ qt_add_executable(${PROJECT_NAME}
     ${HEADERS}
     ${SOURCES}
     ${UI_FILES}
+    ${SHADERS}
 )
 
 target_link_libraries(${PROJECT_NAME}

@@ -4,6 +4,8 @@
 #include <QVulkanInstance>
 #include <QVulkanFunctions>
 
+#include <glm/glm.hpp>
+
 class VulkanWidget;
 
 typedef struct SwapChainDetails {
@@ -19,6 +21,18 @@ typedef struct SwapchainImage {
 } SwapchainImage_t;
 
 
+struct Vertex {
+    glm::vec3 pos; // Vertex position (x, y, z)
+    glm::vec3 col; // Vertex color (r, g, b)
+};
+
+
+struct UboModelViewProjection {
+    glm::mat4 model;
+    glm::mat4 view;
+    glm::mat4 projection;
+};
+
 class VulkanRenderer
 {
 
@@ -33,13 +47,31 @@ public:
 private:
     void createInstance();
     void createSurface();
+
+    // Before graphics pipeline
     void selectPhysicalDevice();
     void createLogicalDevice();
     void createQueues();
-    void createCommandPools();
-    VkCommandPool createCommandPool(const uint32_t iQueueFamilyIndex);
     void createSwapChain();
     void createDescriptorSetLayout();
+    void createGraphicsPipeline();
+    VkShaderModule createShaderModule(const std::vector<char>& iShaderCode);
+
+    // After graphics pipeline
+    void createCommandPools();
+    VkCommandPool createCommandPool(const uint32_t iQueueFamilyIndex);
+    void createCommandBuffers();
+    void createUniformBuffers();
+    void createBuffer(const VkPhysicalDevice iPhysicalDevice,
+                      const VkDevice iDevice,
+                      const VkDeviceSize iBufferSize,
+                      const VkBufferUsageFlags iBufferUsageFlags,
+                      const VkMemoryPropertyFlags iBufferProperties,
+                      VkBuffer& oBuffer,
+                      VkDeviceMemory& oBufferMemory);
+    const uint32_t findMemoryTypeIndex(const VkPhysicalDevice iPhysicalDevice, const uint32_t allowdedTypes, const VkMemoryPropertyFlags properties);
+    void createDescriptorPool();
+    void createDescriptorSets();
     void createSynchronization();
 
     // Print information
@@ -104,27 +136,41 @@ private:
     VkQueue m_computeQueue{VK_NULL_HANDLE};
     VkQueue m_transferQueue{VK_NULL_HANDLE};
 
+    // - Descriptor Set Layout
+    VkDescriptorSetLayout m_descriptorSetLayout{VK_NULL_HANDLE};
+
+
+    // Graphics Pipeline
+    VkPipelineLayout m_pipelineLayout{VK_NULL_HANDLE};
+    VkPipeline m_pipeline{VK_NULL_HANDLE};
+
     // - Command Pool
     VkCommandPool m_graphicsCommandPool{VK_NULL_HANDLE};
     VkCommandPool m_computeCommandPool{VK_NULL_HANDLE};
     VkCommandPool m_transferCommandPool{VK_NULL_HANDLE};
 
-    // - Descriptor Set Layout
-    VkDescriptorSetLayout m_descriptorSetLayout{VK_NULL_HANDLE};
+    // - Command buffer
+    std::vector<VkCommandBuffer> m_graphicsCommandBuffers;
+
+    // - Uniform buffer
+    std::vector<VkBuffer> m_uboModelViewProjectionBuffers;
+    std::vector<VkDeviceMemory> m_uboModelViewProjectionBuffersMemory;
+
 
     // - Synchronizaiton resources
-    static constexpr uint32_t MAX_FRAMES_IN_FLIGHT{2};
+    static constexpr uint32_t MAX_FRAMES_IN_FLIGHT{2}; // Normally 2 or 3
     std::vector<VkSemaphore> m_imagesAvailable;
     std::vector<VkSemaphore> m_renderFinished;
     std::vector<VkFence> m_fences;
     size_t m_currentFrame{0};
-
 
     // SUPPORT
     // - Pointer to functions
     QVulkanFunctions* m_pFunctions{VK_NULL_HANDLE};
     QVulkanDeviceFunctions* m_pDeviceFunctions{VK_NULL_HANDLE};
 
+    // - Read File
+    std::vector<char> readFile(const std::string& iFilePath);
 };
 
 #endif // VULKANRENDERER_H
