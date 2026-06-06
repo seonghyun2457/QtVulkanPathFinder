@@ -6,6 +6,9 @@
 
 #include <glm/glm.hpp>
 
+
+#include "Rectangle.h"
+
 class VulkanWidget;
 
 typedef struct SwapChainDetails {
@@ -21,18 +24,6 @@ typedef struct SwapchainImage {
 } SwapchainImage_t;
 
 
-struct Vertex {
-    glm::vec3 pos; // Vertex position (x, y, z)
-    glm::vec3 col; // Vertex color (r, g, b)
-};
-
-
-struct UboModelViewProjection {
-    glm::mat4 model;
-    glm::mat4 view;
-    glm::mat4 projection;
-};
-
 class VulkanRenderer
 {
 
@@ -45,7 +36,13 @@ public:
 
     void recreateSwapChain();
 
-    void draw();
+    void draw(const std::vector<Rectangle>& iObjects);
+
+    void createVertexBuffer(const std::vector<Vertex>& iVertices, VkBuffer& oBuffer, VkDeviceMemory& oBufferMemory);
+    void createIndexBuffer(const std::vector<uint32_t>& iIndices, VkBuffer& oBuffer, VkDeviceMemory& oBufferMemory);
+    void destroyBuffer(VkBuffer& ioBuffer);
+    void destroyBufferMemory(VkDeviceMemory& ioBufferMemory);
+
 private:
     void createInstance();
     void createSurface();
@@ -64,16 +61,11 @@ private:
     VkCommandPool createCommandPool(const uint32_t iQueueFamilyIndex);
     void createCommandBuffers();
     void createUniformBuffers();
-    void createBuffer(const VkPhysicalDevice iPhysicalDevice,
-                      const VkDevice iDevice,
-                      const VkDeviceSize iBufferSize,
-                      const VkBufferUsageFlags iBufferUsageFlags,
-                      const VkMemoryPropertyFlags iBufferProperties,
-                      VkBuffer& oBuffer,
-                      VkDeviceMemory& oBufferMemory);
-    const uint32_t findMemoryTypeIndex(const VkPhysicalDevice iPhysicalDevice, const uint32_t allowdedTypes, const VkMemoryPropertyFlags properties);
     void createDescriptorPool();
     void createDescriptorSets();
+
+    void recordCommands(const uint32_t iImageIndex, const std::vector<Rectangle>& iObjects);
+    void updateUniformBuffers(const uint32_t iImageIndex);
 
     // Synchronization
     void createSynchronization();
@@ -93,11 +85,28 @@ private:
     const VkImageView createImageView(const VkImage iImage, const VkFormat iFormat, const VkImageAspectFlags iAspectFlags);
     void destroySwapChainResources();
 
+    // Buffer methods
+    void copyBuffer(const VkDeviceSize iBufferSize, VkBuffer& iSrcBuffer, VkBuffer& iDstBuffer);
+    void createBuffer(const VkPhysicalDevice iPhysicalDevice,
+                      const VkDevice iDevice,
+                      const VkDeviceSize iBufferSize,
+                      const VkBufferUsageFlags iBufferUsageFlags,
+                      const VkMemoryPropertyFlags iBufferProperties,
+                      VkBuffer& oBuffer,
+                      VkDeviceMemory& oBufferMemory);
+    const uint32_t findMemoryTypeIndex(const VkPhysicalDevice iPhysicalDevice, const uint32_t allowdedTypes, const VkMemoryPropertyFlags properties);
+
     // Extension functions
     bool extensionSupported(const char* iExtension) const;
 private:
     // Window
     VulkanWidget* m_window{nullptr};
+
+    struct UboModelViewProjection {
+        glm::mat4 model;
+        glm::mat4 view;
+        glm::mat4 projection;
+    } m_uboModelViewProjection;
 
     // VULKAN COMPONENTS
     // - QVulkanInstance

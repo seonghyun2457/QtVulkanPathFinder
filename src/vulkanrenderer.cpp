@@ -76,18 +76,12 @@ void VulkanRenderer::cleanup()
     {
         // Destroy buffer
         for (size_t i = 0; i < m_uboModelViewProjectionBuffers.size(); ++i) {
-            if (m_uboModelViewProjectionBuffers[i] != VK_NULL_HANDLE) {
-                m_pDeviceFunctions->vkDestroyBuffer(m_logicalDevice, m_uboModelViewProjectionBuffers[i], nullptr);
-                m_uboModelViewProjectionBuffers[i] = VK_NULL_HANDLE;
-            }
+            destroyBuffer(m_uboModelViewProjectionBuffers[i]);
         }
 
         // Free buffer memory
         for (size_t i = 0; i < m_uboModelViewProjectionBuffersMemory.size(); ++i) {
-            if (m_uboModelViewProjectionBuffersMemory[i] != VK_NULL_HANDLE) {
-                m_pDeviceFunctions->vkFreeMemory(m_logicalDevice, m_uboModelViewProjectionBuffersMemory[i], nullptr);
-                m_uboModelViewProjectionBuffersMemory[i] = VK_NULL_HANDLE;
-            }
+            destroyBufferMemory(m_uboModelViewProjectionBuffersMemory[i]);
         }
     }
 
@@ -215,9 +209,174 @@ void VulkanRenderer::recreateSwapChain()
     }
 }
 
-void VulkanRenderer::draw()
+void VulkanRenderer::draw(const std::vector<Rectangle>& iObjects)
 {
     printDebugInfo("draw");
+
+    Q_ASSERT(m_pDeviceFunctions != nullptr);
+
+    // GET NEXT IMAGE
+    // Wait for give fence to signal (open) from last draw before continuing
+    m_pDeviceFunctions->vkWaitForFences(m_logicalDevice, 1, &m_fences[m_currentFrame], VK_TRUE, std::numeric_limits<uint64_t>::max());
+    // Manually reset (close) fences
+    m_pDeviceFunctions->vkResetFences(m_logicalDevice, 1, &m_fences[m_currentFrame]);
+
+    // Get index of next image to be drawn to, and signal semaphore then ready to be drwan to
+    uint32_t imageIndex = 0;
+    auto* vkAcquireNextImageKHR = (PFN_vkAcquireNextImageKHR)m_vulkanInstance.getInstanceProcAddr("vkAcquireNextImageKHR");
+    Q_ASSERT(vkAcquireNextImageKHR != nullptr);
+
+    vkAcquireNextImageKHR(m_logicalDevice, m_swapchain, std::numeric_limits<uint64_t>::max(), m_imagesAvailable[m_currentFrame], VK_NULL_HANDLE, &imageIndex);
+
+    // Update Uniform buffers
+    recordCommands(imageIndex, iObjects);
+    updateUniformBuffers(imageIndex);
+
+    // SUBMIT COMMAND BUFFER TO RENDERER
+    {
+        // Queue submission information
+        VkSubmitInfo submitInfo{};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submitInfo.waitSemaphoreCount = 1;                                                     // Number of semaphores to wait on
+        submitInfo.pWaitSemaphores = &m_imagesAvailable[m_currentFrame];                       // list of semaphores to wait on
+        VkPipelineStageFlags stageFlags[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+        submitInfo.pWaitDstStageMask = stageFlags;                                             // Stages to check semaphores at
+        submitInfo.commandBufferCount = 1;                                                     // Number of command buffers to submit
+        submitInfo.pCommandBuffers = &m_graphicsCommandBuffers[imageIndex];                    // Command buffer to submit
+        submitInfo.signalSemaphoreCount = 1;                                                   // Number of semaphores to signal
+        submitInfo.pSignalSemaphores = &m_renderFinished[imageIndex];                          // Semaphores to signal when command buffer finishes submitting
+
+        // Submit command buffer to Graphics queue
+        VkResult result = m_pDeviceFunctions->vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, m_fences[m_currentFrame]);
+        if (result != VK_SUCCESS) throw std::runtime_error("Failed to submit Command buffer to Graphics queue");
+    }
+
+
+    // PRESENT RENDERED IMAGE TO SCREEN
+    {
+        VkPresentInfoKHR presentInfo{};
+        presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+        presentInfo.waitSemaphoreCount = 1;
+        presentInfo.pWaitSemaphores = &m_renderFinished[imageIndex];
+        presentInfo.swapchainCount = 1;
+        presentInfo.pSwapchains = &m_swapchain;
+        presentInfo.pImageIndices = &imageIndex;
+
+        // Present rendered image to screen
+        auto* vkQueuePresentKHR = (PFN_vkQueuePresentKHR)m_vulkanInstance.getInstanceProcAddr("vkQueuePresentKHR");
+        Q_ASSERT(vkQueuePresentKHR != nullptr);
+        VkResult result = vkQueuePresentKHR(m_graphicsQueue, &presentInfo);
+        if (result != VK_SUCCESS) throw std::runtime_error("Failed to present the rendered image to screen");
+    }
+
+    // GET NEXT FRAME
+    m_currentFrame = (m_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+}
+
+void VulkanRenderer::createVertexBuffer(const std::vector<Vertex>& iVertices,VkBuffer& oBuffer, VkDeviceMemory& oBufferMemory)
+{
+    Q_ASSERT(m_pDeviceFunctions != nullptr);
+
+    const VkDeviceSize bufferSize = sizeof(Vertex) * iVertices.size();
+
+    // Temporary buffer to "stage" vertex data before transferring to GPU
+    VkBuffer stagingBuffer{VK_NULL_HANDLE};
+    VkDeviceMemory stagingBufferMemory{VK_NULL_HANDLE};
+
+    // Create Buffer and Allocate memory
+    createBuffer(m_physicalDevice,
+                 m_logicalDevice,
+                 bufferSize,
+                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 stagingBuffer,
+                 stagingBufferMemory);
+
+    // Map memory to vertex buffer (CPU is writing to the mapping process)
+    void* pData = nullptr;                                                                                // 1. Cretae pointer  to a pointer in normal memory
+    m_pDeviceFunctions->vkMapMemory(m_logicalDevice, stagingBufferMemory, 0, bufferSize, 0, &pData);      // 2. Map the vertex buffer memory to the pointer
+    memcpy(pData, iVertices.data(), static_cast<size_t>(bufferSize));                                     // 3. Copy memory from vertices vector to the pointer
+    m_pDeviceFunctions->vkUnmapMemory(m_logicalDevice, stagingBufferMemory);                              // 4. Unmap the vertex buffer memory
+
+    // Create buffer with TRANSFER_DST_BIT to mark as recipient of transfer data (also VERTEX_BUFFER)
+    // Buffer memory is to be DEVICE_LOCAL_BIT meaning memory is on the GPU and only accessible by it  and not CPU (host)
+    createBuffer(m_physicalDevice,
+                 m_logicalDevice,
+                 bufferSize,
+                 VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, // Only visible to GPU
+                 oBuffer,
+                 oBufferMemory);
+
+    // Copy stagaing bufeer to vertex buffer on GPU
+    copyBuffer(bufferSize, stagingBuffer, oBuffer);
+
+    // Clean up staging buffer parts
+    destroyBuffer(stagingBuffer);
+    destroyBufferMemory(stagingBufferMemory);
+}
+
+void VulkanRenderer::createIndexBuffer(const std::vector<uint32_t>& iIndices, VkBuffer& oBuffer, VkDeviceMemory& oBufferMemory)
+{
+    Q_ASSERT(m_pDeviceFunctions != nullptr);
+
+    const VkDeviceSize bufferSize = sizeof(uint32_t) * iIndices.size();
+
+    // Temporary buffer to "stage" index data before transferring to GPU
+    VkBuffer stagingBuffer{VK_NULL_HANDLE};
+    VkDeviceMemory stagingBufferMemory{VK_NULL_HANDLE};
+
+    // Create Buffer and Allocate memory
+    createBuffer(m_physicalDevice,
+                 m_logicalDevice,
+                 bufferSize,
+                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 stagingBuffer,
+                 stagingBufferMemory);
+
+    // Map memory to index buffer (CPU is writing to the mapping process)
+    void* pData = nullptr;                                                                                // 1. Cretae pointer  to a pointer in normal memory
+    m_pDeviceFunctions->vkMapMemory(m_logicalDevice, stagingBufferMemory, 0, bufferSize, 0, &pData);      // 2. Map the index buffer memory to the pointer
+    memcpy(pData, iIndices.data(), static_cast<size_t>(bufferSize));                                      // 3. Copy memory from vertices vector to the pointer
+    m_pDeviceFunctions->vkUnmapMemory(m_logicalDevice, stagingBufferMemory);                              // 4. Unmap the index buffer memory
+
+    // Create buffer with TRANSFER_DST_BIT to mark as recipient of transfer data (also VERTEX_BUFFER)
+    // Buffer memory is to be DEVICE_LOCAL_BIT meaning memory is on the GPU and only accessible by it  and not CPU (host)
+    createBuffer(m_physicalDevice,
+                 m_logicalDevice,
+                 bufferSize,
+                 VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, // Only visible to GPU
+                 oBuffer,
+                 oBufferMemory);
+
+    // Copy stagaing bufeer to vertex buffer on GPU
+    copyBuffer(bufferSize, stagingBuffer, oBuffer);
+
+    // Clean up staging buffer parts
+    destroyBuffer(stagingBuffer);
+    destroyBufferMemory(stagingBufferMemory);
+}
+
+void VulkanRenderer::destroyBuffer(VkBuffer& ioBuffer)
+{
+    Q_ASSERT(m_pDeviceFunctions != nullptr);
+
+    if (ioBuffer != VK_NULL_HANDLE) {
+        m_pDeviceFunctions->vkDestroyBuffer(m_logicalDevice, ioBuffer, nullptr);
+        ioBuffer = VK_NULL_HANDLE;
+    }
+}
+
+void VulkanRenderer::destroyBufferMemory(VkDeviceMemory& ioBufferMemory)
+{
+    Q_ASSERT(m_pDeviceFunctions != nullptr);
+
+    if (ioBufferMemory != VK_NULL_HANDLE) {
+        m_pDeviceFunctions->vkFreeMemory(m_logicalDevice, ioBufferMemory, nullptr);
+        ioBufferMemory = VK_NULL_HANDLE;
+    }
 }
 
 void VulkanRenderer::createInstance()
@@ -451,6 +610,7 @@ void VulkanRenderer::createLogicalDevice()
     if (result != VK_SUCCESS) throw std::runtime_error("Failed to create a logical device");
 
     m_pDeviceFunctions = m_vulkanInstance.deviceFunctions(m_logicalDevice);
+
 
     Q_ASSERT(m_pDeviceFunctions != VK_NULL_HANDLE);
 
@@ -711,6 +871,151 @@ void VulkanRenderer::createDescriptorSets()
         // Update the descriptor set with new buffer/binding info
         m_pDeviceFunctions->vkUpdateDescriptorSets(m_logicalDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
     }
+}
+
+void VulkanRenderer::recordCommands(const uint32_t iImageIndex, const std::vector<Rectangle>& iObjects)
+{
+    Q_ASSERT(m_pDeviceFunctions != nullptr);
+
+    // Reset Command buffer
+    VkCommandBuffer commandBuffer = m_graphicsCommandBuffers[iImageIndex];
+    m_pDeviceFunctions->vkResetCommandBuffer(commandBuffer, 0);
+
+    // Information about how to begin each command buffer
+    VkCommandBufferBeginInfo commandBufferBeginInfo{};
+    commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+    // Start recording commands
+    VkResult result = m_pDeviceFunctions->vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo);
+    if (result != VK_SUCCESS) throw std::runtime_error("Failed to start recording Command buffer");
+
+    // RECORD COMMANDS
+    {
+        // Image layout transformation (UNDEFINED -> COLOR_ATTACHMENT)
+        VkImageMemoryBarrier imageMemoryBarrierToRender{};
+        imageMemoryBarrierToRender.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        imageMemoryBarrierToRender.oldLayout           = VK_IMAGE_LAYOUT_UNDEFINED;
+        imageMemoryBarrierToRender.newLayout           = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        imageMemoryBarrierToRender.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        imageMemoryBarrierToRender.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        imageMemoryBarrierToRender.image               = m_swapchainImages[iImageIndex].image;
+        imageMemoryBarrierToRender.subresourceRange    = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+        imageMemoryBarrierToRender.srcAccessMask       = 0;
+        imageMemoryBarrierToRender.dstAccessMask       = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+        m_pDeviceFunctions->vkCmdPipelineBarrier(commandBuffer,
+                                                 VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                                                 VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                                                 0, 0, nullptr, 0, nullptr,
+                                                 1, &imageMemoryBarrierToRender);
+
+        // Rendering attachment information for Dynamic rendering
+        VkRenderingAttachmentInfo renderingAttachmentInfo{};
+        renderingAttachmentInfo.sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+        renderingAttachmentInfo.imageView   = m_swapchainImages[iImageIndex].imageView;
+        renderingAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        renderingAttachmentInfo.loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        renderingAttachmentInfo.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
+        renderingAttachmentInfo.clearValue  = {{{0.f, 0.f, 0.f, 1.f}}};
+
+        VkRenderingInfo renderingInfo{};
+        renderingInfo.sType                = VK_STRUCTURE_TYPE_RENDERING_INFO;
+        renderingInfo.renderArea.offset    = {0, 0};
+        renderingInfo.renderArea.extent    = m_extent;
+        renderingInfo.layerCount           = 1;
+        renderingInfo.colorAttachmentCount = 1;
+        renderingInfo.pColorAttachments    = &renderingAttachmentInfo;
+
+        auto* vkCmdBeginRendering = (PFN_vkCmdBeginRendering)(m_vulkanInstance.getInstanceProcAddr("vkCmdBeginRendering"));
+        Q_ASSERT(vkCmdBeginRendering != nullptr);
+        vkCmdBeginRendering(commandBuffer, &renderingInfo);
+
+        // RECORD RENDERING COMMANDS
+        {
+            // Bind Graphic pipeline
+            m_pDeviceFunctions->vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
+            // Set Primitive Topology
+            auto* vkCmdSetPrimitiveTopology = (PFN_vkCmdSetPrimitiveTopology)(m_vulkanInstance.getInstanceProcAddr("vkCmdSetPrimitiveTopology"));
+            Q_ASSERT(vkCmdSetPrimitiveTopology != nullptr);
+            vkCmdSetPrimitiveTopology(commandBuffer, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+
+            // Viewport
+            VkViewport viewport{};
+            viewport.x        = 0.0f;
+            viewport.y        = 0.0f;
+            viewport.width    = static_cast<float>(m_extent.width);
+            viewport.height   = static_cast<float>(m_extent.height);
+            viewport.minDepth = 0.0f;
+            viewport.maxDepth = 1.0f;
+
+            m_pDeviceFunctions->vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
+            // Scissor
+            VkRect2D scissor{};
+            scissor.offset = {0, 0};
+            scissor.extent = m_extent;
+
+            m_pDeviceFunctions->vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+            for (size_t i = 0; i < iObjects.size(); ++i) {
+
+                // Bind mesh vertex buffer with 0 offset
+                std::array<VkBuffer, 1> vertexBuffer = { iObjects[i].getVertexBuffer() }; // Buffers to bind
+                std::array<VkDeviceSize, 1> offsets = { 0 };                              // Offsets into buffers being bound
+                m_pDeviceFunctions->vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffer.data(), offsets.data()); // Command to bind vertex buffer before drawing with that
+
+                // Bind mesh index buffer with 0 offset and using the uint32 type
+                m_pDeviceFunctions->vkCmdBindIndexBuffer(commandBuffer, iObjects[i].getIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
+
+                // Bind Descriptor sets (for Uniform Buffer ModelViewProjection)
+                m_pDeviceFunctions->vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout,
+                                                        0, 1,
+                                                        &m_descriptorSets[iImageIndex],
+                                                        0, nullptr);
+
+                // Draw by index
+                m_pDeviceFunctions->vkCmdDrawIndexed(commandBuffer, iObjects[i].getIndexCount(), 1, 0, 0, 0);
+            }
+        }
+
+        auto* vkCmdEndRendering = (PFN_vkCmdEndRendering)(m_vulkanInstance.getInstanceProcAddr("vkCmdEndRendering"));
+        Q_ASSERT(vkCmdBeginRendering != nullptr);
+        vkCmdEndRendering(commandBuffer);
+
+
+        // Image layout transformation (COLOR_ATTACHMENT -> PRESENT)
+        VkImageMemoryBarrier imageMemoryBarrierToPresent{};
+        imageMemoryBarrierToPresent.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        imageMemoryBarrierToPresent.oldLayout           = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        imageMemoryBarrierToPresent.newLayout           = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        imageMemoryBarrierToPresent.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        imageMemoryBarrierToPresent.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        imageMemoryBarrierToPresent.image               = m_swapchainImages[iImageIndex].image;
+        imageMemoryBarrierToPresent.subresourceRange    = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+        imageMemoryBarrierToPresent.srcAccessMask       = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        imageMemoryBarrierToPresent.dstAccessMask       = 0;
+
+        m_pDeviceFunctions->vkCmdPipelineBarrier(commandBuffer,
+                                                VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                                                VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                                                0, 0, nullptr, 0, nullptr,
+                                                1, &imageMemoryBarrierToPresent);
+    }
+
+    // Stop recording commands
+    result = m_pDeviceFunctions->vkEndCommandBuffer(commandBuffer);
+    if (result != VK_SUCCESS) throw std::runtime_error("Failed to stop recording Command buffer");
+}
+
+void VulkanRenderer::updateUniformBuffers(const uint32_t iImageIndex)
+{
+    Q_ASSERT(m_pDeviceFunctions != nullptr);
+
+    // Copy ModelViewProjection data to uniform buffer
+    void* pData = nullptr;
+    m_pDeviceFunctions->vkMapMemory(m_logicalDevice, m_uboModelViewProjectionBuffersMemory[iImageIndex], 0, sizeof(m_uboModelViewProjection), 0, &pData);
+    memcpy(pData, &m_uboModelViewProjection, sizeof(m_uboModelViewProjection));
+    m_pDeviceFunctions->vkUnmapMemory(m_logicalDevice, m_uboModelViewProjectionBuffersMemory[iImageIndex]);
 }
 
 void VulkanRenderer::createSwapChain()
@@ -1058,9 +1363,9 @@ void VulkanRenderer::createSynchronization()
 
     Q_ASSERT(m_pDeviceFunctions!= nullptr);
 
-    m_imagesAvailable.resize(MAX_FRAMES_IN_FLIGHT, VK_NULL_HANDLE);
-    m_renderFinished.resize(MAX_FRAMES_IN_FLIGHT,  VK_NULL_HANDLE);
-    m_fences.resize(MAX_FRAMES_IN_FLIGHT,          VK_NULL_HANDLE);
+    m_imagesAvailable.resize(MAX_FRAMES_IN_FLIGHT,     VK_NULL_HANDLE);
+    m_renderFinished.resize(m_swapchainImages.size(),  VK_NULL_HANDLE);
+    m_fences.resize(MAX_FRAMES_IN_FLIGHT,              VK_NULL_HANDLE);
 
     // Semaphore creation information
     VkSemaphoreCreateInfo semaphoreCreateInfo{};
@@ -1278,6 +1583,57 @@ void VulkanRenderer::destroySwapChainResources()
     }
 
     m_swapchainImages.clear();
+}
+
+void VulkanRenderer::copyBuffer(const VkDeviceSize iBufferSize, VkBuffer &iSrcBuffer, VkBuffer &iDstBuffer)
+{
+    Q_ASSERT(m_pDeviceFunctions != nullptr);
+
+    // Command buffer to hold transfer commands
+    VkCommandBuffer commandBuffer{};
+
+    // Command buffer allocate information
+    VkCommandBufferAllocateInfo commandBufferAllocateInfo{};
+    commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    commandBufferAllocateInfo.commandPool = m_graphicsCommandPool;
+    commandBufferAllocateInfo.commandBufferCount = 1;
+
+    // Allocate command buffer from pool
+    m_pDeviceFunctions->vkAllocateCommandBuffers(m_logicalDevice, &commandBufferAllocateInfo, &commandBuffer);
+
+    // Information to begin the command buffer record
+    VkCommandBufferBeginInfo commandBufferBeginInfo{};
+    commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    commandBufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT; // We only use the command buffer once
+
+    // Begin recording commands
+    m_pDeviceFunctions->vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo);
+
+    // Region of data to copy from and to
+    VkBufferCopy bufferCopyRegion{};
+    bufferCopyRegion.srcOffset = 0;
+    bufferCopyRegion.dstOffset = 0;
+    bufferCopyRegion.size = iBufferSize;
+
+    // Command to copy src buffer to dst buffer
+    m_pDeviceFunctions->vkCmdCopyBuffer(commandBuffer, iSrcBuffer, iDstBuffer, 1, &bufferCopyRegion);
+
+    // End commands
+    m_pDeviceFunctions->vkEndCommandBuffer(commandBuffer);
+
+    // Queue submission information
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandBuffer;
+
+    // Submit command to queue and wait until it finishes
+    m_pDeviceFunctions->vkQueueSubmit(m_graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+    m_pDeviceFunctions->vkQueueWaitIdle(m_graphicsQueue);
+
+    // Free temporary command buffer back to pool
+    m_pDeviceFunctions->vkFreeCommandBuffers(m_logicalDevice, m_graphicsCommandPool, 1, &commandBuffer);
 }
 
 bool VulkanRenderer::extensionSupported(const char* iExtension) const
