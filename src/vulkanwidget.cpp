@@ -11,10 +11,13 @@ VulkanWidget::VulkanWidget()
 
     // Disable mouseMoveEvent
     setMouseGrabEnabled(false);
+
 }
 
 VulkanWidget::~VulkanWidget()
 {
+    m_objects.clear();
+
     qDebug() << "destroy VulkanWidget";
     m_pVulkanRenderer = nullptr;
     qDebug() << "VulkanWidget destroyed";
@@ -90,6 +93,8 @@ void VulkanWidget::initializeRenderer()
         emit sendDebugInfo("Failed to initialize Vulkan renderer");
     } else {
         emit sendDebugInfo("Succeeded to initialize Vulkan renderer");
+
+        // m_objects.emplace_back(m_pVulkanRenderer.get());
     };
 }
 
@@ -98,7 +103,7 @@ void VulkanWidget::draw()
     emit sendDebugInfo("draw");
 
     if (m_pVulkanRenderer && m_initisialized) {
-        m_pVulkanRenderer->draw();
+        m_pVulkanRenderer->draw(m_objects);
     }
 
 

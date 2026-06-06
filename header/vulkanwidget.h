@@ -5,6 +5,7 @@
 #include <QMouseEvent>
 
 #include "vulkanrenderer.h"
+#include "rectangle.h"
 
 class VulkanWidget : public QWindow
 {
@@ -38,6 +39,8 @@ private:
 private:
     std::unique_ptr<VulkanRenderer> m_pVulkanRenderer;
     bool m_initisialized{false};
+
+    std::vector<Rectangle> m_objects;
 };
 
 #endif // VULKANWIDGET_H
