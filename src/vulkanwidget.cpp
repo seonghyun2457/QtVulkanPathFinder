@@ -24,6 +24,28 @@ VulkanWidget::~VulkanWidget()
     qDebug() << "VulkanWidget destroyed";
 }
 
+void VulkanWidget::setRowCount(const uint32_t iRowCount)
+{
+    m_rowCount = iRowCount;
+
+    if ((m_pVulkanRenderer != nullptr) && m_initisialized) {
+
+    }
+
+    sendDebugInfo("row count: " + QString::number(m_rowCount));
+}
+
+void VulkanWidget::setColumnCount(const uint32_t iColumnCount)
+{
+    m_colCount = iColumnCount;
+
+    if ((m_pVulkanRenderer != nullptr) && m_initisialized) {
+
+    }
+
+    sendDebugInfo("column count: " + QString::number(m_colCount));
+}
+
 void VulkanWidget::exposeEvent(QExposeEvent* event)
 {
     if (isExposed() && !m_initisialized) {

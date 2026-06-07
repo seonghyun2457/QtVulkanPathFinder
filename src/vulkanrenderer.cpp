@@ -242,11 +242,12 @@ void VulkanRenderer::recreateSwapChain()
 void VulkanRenderer::draw()
 {
 
+    /*
     for (size_t i = 0; i < m_objects.size(); ++i) {
-
-        // glm::mat4 modelMat = glm::rotate(glm::mat4(1.f), glm::radians(0.f), glm::vec3(0.0f, 0.0f, 1.0f));
-        // iObjects[i].setModel(modelMat);
+        glm::mat4 modelMat = glm::rotate(glm::mat4(1.f), glm::radians(60.f), glm::vec3(0.0f, 0.0f, 1.0f));
+        m_uboModelViewProjection.model = modelMat;
     }
+    */
 
     Q_ASSERT(m_pDeviceFunctions != nullptr);
 

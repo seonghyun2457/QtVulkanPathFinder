@@ -23,6 +23,10 @@ signals:
     void mousePressed(Qt::MouseButton iButton, const QPointF& iPosition);
     void mouseMoved(const QPointF& iPosition);
 
+public slots:
+    void setRowCount(const uint32_t iRowCount);
+    void setColumnCount(const uint32_t iColumnCount);
+
 protected:
     virtual void exposeEvent(QExposeEvent* event) override;
     virtual bool event(QEvent* e) override;
@@ -40,7 +44,8 @@ private:
     std::unique_ptr<VulkanRenderer> m_pVulkanRenderer;
     bool m_initisialized{false};
 
-    std::vector<Rectangle> m_objects;
+    uint32_t m_rowCount{10};
+    uint32_t m_colCount{20};
 };
 
 #endif // VULKANWIDGET_H

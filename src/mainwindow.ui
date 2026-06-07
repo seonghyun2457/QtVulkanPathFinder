@@ -33,6 +33,34 @@
       <item>
        <layout class="QVBoxLayout" name="verticalLayout">
         <item>
+         <layout class="QHBoxLayout" name="hlRow">
+          <item>
+           <widget class="QLabel" name="lbRowCount">
+            <property name="text">
+             <string>Row count:</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QComboBox" name="cbRow"/>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="hlCol">
+          <item>
+           <widget class="QLabel" name="lbColCount">
+            <property name="text">
+             <string>Column count:</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QComboBox" name="cbCol"/>
+          </item>
+         </layout>
+        </item>
+        <item>
          <widget class="QPushButton" name="pushButton">
           <property name="text">
            <string>PushButton</string>

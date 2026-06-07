@@ -12,6 +12,8 @@ MainWindow::MainWindow(QWidget *parent)
     , m_pVulkanWidget(new VulkanWidget())
 {
     m_ui->setupUi(this);
+
+    initializeGuiWidgets();
     initializeVulkanWidget();
 }
 
@@ -34,6 +36,44 @@ void MainWindow::onMousePressed(Qt::MouseButton button, const QPointF &position)
 {
     QString msg = QString("%1 button clicked at (%2, %3)").arg(button).arg(position.x()).arg(position.y());
     displayDebugInfo(msg);
+}
+
+void MainWindow::setRowCount(const int iIndex)
+{
+    bool ok = false;
+    const uint32_t rowCount = m_ui->cbRow->itemText(iIndex).toUInt(&ok);
+    if (ok) emit transferRowCount(rowCount);
+}
+
+void MainWindow::setColumnCount(const int iIndex)
+{
+    bool ok = false;
+    const uint32_t columnCount = m_ui->cbCol->itemText(iIndex).toUInt(&ok);
+    if (ok) emit transferColumnCount(columnCount);
+}
+
+void MainWindow::initializeGuiWidgets()
+{
+    // CONNECT
+    connect(m_ui->cbRow,  &QComboBox::activated, this, &MainWindow::setRowCount);
+    connect(m_ui->cbCol,  &QComboBox::activated, this, &MainWindow::setColumnCount);
+    connect(this,  &MainWindow::transferRowCount, m_pVulkanWidget, &VulkanWidget::setRowCount);
+    connect(this,  &MainWindow::transferColumnCount, m_pVulkanWidget, &VulkanWidget::setColumnCount);
+
+
+    // initialize cbRow
+    for (size_t i = 0; i <= MAX_ROW_COUNT; ++i) {
+        if (i >= 2) {
+            m_ui->cbRow->addItem(QString::number(i));
+        }
+    }
+
+    // initialize cbCol
+    for (size_t i = 0; i <= MAX_COLUMN_COUNT; ++i) {
+        if (i >= 2) {
+            m_ui->cbCol->addItem(QString::number(i));
+        }
+    }
 }
 
 

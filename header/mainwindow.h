@@ -19,6 +19,10 @@ public:
     MainWindow(QWidget *parent = nullptr);
     virtual ~MainWindow();
 
+signals:
+    void transferRowCount(const uint32_t iRowCount);
+    void transferColumnCount(const uint32_t iColumnCount);
+
 private slots:
     // Logging slot
     void displayVulkanInfo(const QString& iVulkanInfo);
@@ -26,11 +30,19 @@ private slots:
 
     // Mouse event slot
     void onMousePressed(Qt::MouseButton button, const QPointF& position);
+
+    // Row & Column slot
+    void setRowCount(const int iIndex);
+    void setColumnCount(const int iIndex);
 private:
+    void initializeGuiWidgets();
     void initializeVulkanWidget();
 
 private:
     std::unique_ptr<Ui::MainWindow> m_ui;
     VulkanWidget* m_pVulkanWidget;
+
+    static constexpr size_t MAX_ROW_COUNT{30};
+    static constexpr size_t MAX_COLUMN_COUNT{40};
 };
 #endif // MAINWINDOW_H
