@@ -216,6 +216,9 @@ void VulkanRenderer::recreateSwapChain()
         return;
     }
 
+    // Wait until Idle status
+    m_pDeviceFunctions->vkDeviceWaitIdle(m_logicalDevice);
+
     // Move current swapchain to old swapchain to recreate
     m_oldSwapchain = m_swapchain;
     m_swapchain    = VK_NULL_HANDLE;
@@ -237,7 +240,6 @@ void VulkanRenderer::recreateSwapChain()
 
 void VulkanRenderer::draw()
 {
-    printDebugInfo("draw");
 
     for (size_t i = 0; i < m_objects.size(); ++i) {
 
@@ -1512,7 +1514,7 @@ const VkSurfaceFormatKHR VulkanRenderer::chooseBestSurfaceFormat(const std::vect
     // Format    : VK_FORMAT_R8G8B8A8_UNORM (VK_FORMAT_B8G8R8A8_UNORM as backup)
     // ColorSpace: VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
 
-    printDebugInfo("Coohse best surface format");
+    printDebugInfo("Choose best surface format");
 
     Q_ASSERT(iFormats.size() > 0);
 
@@ -1534,7 +1536,7 @@ const VkSurfaceFormatKHR VulkanRenderer::chooseBestSurfaceFormat(const std::vect
 
 const VkPresentModeKHR VulkanRenderer::chooseBestPresentationMode(const std::vector<VkPresentModeKHR>& iPresentationModes)
 {
-    printDebugInfo("Coohse best presentaion mode");
+    printDebugInfo("Choose best presentaion mode");
 
     // Look for Mailbox presentation mode
     for (const VkPresentModeKHR& presentationMode : iPresentationModes) {
@@ -1549,7 +1551,7 @@ const VkPresentModeKHR VulkanRenderer::chooseBestPresentationMode(const std::vec
 
 const VkExtent2D VulkanRenderer::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& iSurfaceCapabilities)
 {
-    printDebugInfo("Coohse Swap Extent");
+    printDebugInfo("Choose Swap Extent");
 
     // If current extent is at numeric limits, then extent can vary. Otherwise, it's the size of the window.
     if (iSurfaceCapabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {

@@ -99,8 +99,6 @@ void VulkanWidget::initializeRenderer()
 
 void VulkanWidget::draw()
 {
-    emit sendDebugInfo("draw");
-
     if (m_pVulkanRenderer && m_initisialized) {
         m_pVulkanRenderer->draw();
     }
