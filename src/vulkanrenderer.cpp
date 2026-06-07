@@ -1,3 +1,4 @@
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include "vulkanrenderer.h"
 
 #include "vulkanwidget.h"
@@ -60,14 +61,20 @@ bool VulkanRenderer::initialize()
 
             m_uboModelViewProjection.model = glm::mat4(1.f);
 
-            m_uboModelViewProjection.view = glm::lookAt(glm::vec3(0.f, 0.f, 1.f),
+            m_uboModelViewProjection.view = glm::lookAt(glm::vec3(0.f, 0.f, 10.f),
                                                         glm::vec3(0.f, 0.f, 0.f),
                                                         glm::vec3(0.f, 1.f, 0.f));
 
+            /*
+            const float aspect = m_extent.width / (float)m_extent.height;
             m_uboModelViewProjection.projection = glm::perspective(glm::radians(45.f),
-                                                                   m_extent.width / (float)m_extent.height,
+                                                                   aspect,
                                                                    0.1f,
                                                                    100.f);
+            */
+
+            // use Orthographic projection
+             m_uboModelViewProjection.projection = glm::ortho(-1.f, 1.f, -1.f, 1.f, 0.1f, 100.f);
 
             // GLM was designed for OpenGL, where Y coordinate of the clip coordinates is inverted.
             // The easist way to fix this is to flip the sign on the scaling factor of the Y axis in the projection matrix.
@@ -76,8 +83,8 @@ bool VulkanRenderer::initialize()
 
         {
             std::vector<Vertex> vertices1 = {
-                                                Vertex(glm::vec3(-0.8f, 0.4f, 0.f),  glm::vec3(1.f, 0.f, 0.f)),  // 0
-                                                Vertex(glm::vec3(-0.8f, -0.4f, 0.f), glm::vec3(1.f, 0.f, 0.f)),  // 1
+                                                Vertex(glm::vec3(-0.9f, 0.4f, 0.f),  glm::vec3(1.f, 0.f, 0.f)),  // 0
+                                                Vertex(glm::vec3(-1.0f, -0.4f, 0.f), glm::vec3(1.f, 0.f, 0.f)),  // 1
                                                 Vertex(glm::vec3(-0.4f, -0.4f, 0.f),  glm::vec3(1.f, 0.f, 0.f)),  // 2
                                                 Vertex(glm::vec3(-0.4f, 0.4f, 0.f),   glm::vec3(1.f, 0.f, 0.f))   // 3
                                             };
