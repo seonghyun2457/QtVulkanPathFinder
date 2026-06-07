@@ -15,7 +15,7 @@ class VulkanRenderer;
 class Rectangle
 {
 public:
-    Rectangle(VulkanRenderer* renderer, const std::vector<Vertex>& vertices);
+    Rectangle(VulkanRenderer* renderer, const glm::vec2& iPos, const float halfWidth, const float halfHeight);
     virtual ~Rectangle();
 
     Rectangle(const Rectangle& iOther) = delete;

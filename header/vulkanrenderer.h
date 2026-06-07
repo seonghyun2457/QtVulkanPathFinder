@@ -38,6 +38,8 @@ public:
 
     void draw();
 
+    void addRectangle(const glm::vec2 iPos, const float normalizedHalfWidth, const float normalizedHalfHeight);
+
     void createVertexBuffer(const std::vector<Vertex>& iVertices, VkBuffer& oBuffer, VkDeviceMemory& oBufferMemory);
     void createIndexBuffer(const std::vector<uint32_t>& iIndices, VkBuffer& oBuffer, VkDeviceMemory& oBufferMemory);
     void destroyBuffer(VkBuffer& ioBuffer);

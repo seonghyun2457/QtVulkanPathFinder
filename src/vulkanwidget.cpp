@@ -15,6 +15,7 @@ VulkanWidget::VulkanWidget()
     // Disable mouseMoveEvent
     setMouseGrabEnabled(false);
 
+    m_occupied.resize(m_rowCount * m_colCount, false);
 }
 
 VulkanWidget::~VulkanWidget()
@@ -27,23 +28,15 @@ VulkanWidget::~VulkanWidget()
 void VulkanWidget::setRowCount(const uint32_t iRowCount)
 {
     m_rowCount = iRowCount;
-
-    if ((m_pVulkanRenderer != nullptr) && m_initisialized) {
-
-    }
-
     sendDebugInfo("row count: " + QString::number(m_rowCount));
+    m_occupied.resize(m_rowCount * m_colCount, false);
 }
 
 void VulkanWidget::setColumnCount(const uint32_t iColumnCount)
 {
     m_colCount = iColumnCount;
-
-    if ((m_pVulkanRenderer != nullptr) && m_initisialized) {
-
-    }
-
     sendDebugInfo("column count: " + QString::number(m_colCount));
+    m_occupied.resize(m_rowCount * m_colCount, false);
 }
 
 void VulkanWidget::exposeEvent(QExposeEvent* event)
@@ -92,6 +85,28 @@ void VulkanWidget::resizeEvent(QResizeEvent* event)
 
 void VulkanWidget::mousePressEvent(QMouseEvent* event)
 {
+    const float rectangleWidth = (width() / static_cast<float>(m_rowCount));
+    const float rectangleHeight = (height() / static_cast<float>(m_colCount));
+
+    const size_t rectangleRowIndex = static_cast<size_t>(event->position().x() / rectangleWidth);
+    const size_t rectangleColIndex = static_cast<size_t>(event->position().y() / rectangleHeight);
+
+    if (m_occupied[(rectangleColIndex * m_rowCount) + rectangleRowIndex] == false) {
+        m_occupied[(rectangleColIndex * m_rowCount) + rectangleRowIndex] = true;
+
+        const float normalizedRectangleHalfWidth = rectangleWidth / static_cast<float>(width());
+        const float normalizedRectangleHalfHeight = rectangleHeight / static_cast<float>(height());
+
+        float halfWidth = 0.5f * width();
+        float halfHeight = 0.5f * height();
+
+        float normalizedXPos = (((rectangleRowIndex * rectangleWidth) - halfWidth) / static_cast<float>(halfWidth)) + normalizedRectangleHalfWidth;
+        float normalizedYPos = -((((rectangleColIndex * rectangleHeight) - halfHeight) / static_cast<float>(halfHeight)) + normalizedRectangleHalfHeight);
+
+        glm::vec2 recPos{normalizedXPos, normalizedYPos};
+        m_pVulkanRenderer->addRectangle(recPos, normalizedRectangleHalfWidth, normalizedRectangleHalfHeight);
+    }
+
     emit mousePressed(event->button(), event->position());
     QWindow::mousePressEvent(event);
 }

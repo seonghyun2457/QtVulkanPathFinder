@@ -4,18 +4,16 @@
 
 #include "vulkanrenderer.h"
 
-Rectangle::Rectangle(VulkanRenderer* renderer, const std::vector<Vertex>& vertices)
+Rectangle::Rectangle(VulkanRenderer* renderer, const glm::vec2& iPos, const float halfWidth, const float halfHeight)
     : m_renderer(renderer)
 {
-    m_vertices = vertices;
-                /*
-                {
-                    Vertex(glm::vec3(-0.4f, 0.4f, 0.f),  glm::vec3(1.f, 0.f, 0.f)),  // 0
-                    Vertex(glm::vec3(-0.4f, -0.4f, 0.f), glm::vec3(1.f, 0.f, 0.f)),  // 1
-                    Vertex(glm::vec3(0.4f, -0.4f, 0.f),  glm::vec3(1.f, 0.f, 0.f)),  // 2
-                    Vertex(glm::vec3(0.4f, 0.4f, 0.f),   glm::vec3(1.f, 0.f, 0.f))   // 3
-                };
-                */
+    m_vertices = {
+                    Vertex(glm::vec3(iPos.x - halfWidth, iPos.y + halfHeight, 0.f),  glm::vec3(1.f, 0.f, 0.f)),  // 0
+                    Vertex(glm::vec3(iPos.x - halfWidth, iPos.y - halfHeight, 0.f), glm::vec3(1.f, 0.f, 0.f)),  // 1
+                    Vertex(glm::vec3(iPos.x + halfWidth, iPos.y - halfHeight, 0.f),  glm::vec3(1.f, 0.f, 0.f)),  // 2
+                    Vertex(glm::vec3(iPos.x + halfWidth, iPos.y + halfHeight, 0.f),   glm::vec3(1.f, 0.f, 0.f))   // 3
+                 };
+
 
     m_indices = {0, 1, 2,
                  2, 3, 0};

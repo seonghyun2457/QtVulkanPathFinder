@@ -44,8 +44,10 @@ private:
     std::unique_ptr<VulkanRenderer> m_pVulkanRenderer;
     bool m_initisialized{false};
 
-    uint32_t m_rowCount{10};
-    uint32_t m_colCount{20};
+    uint32_t m_rowCount{2};
+    uint32_t m_colCount{2};
+
+    std::vector<bool> m_occupied;
 };
 
 #endif // VULKANWIDGET_H

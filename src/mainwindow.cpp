@@ -55,24 +55,23 @@ void MainWindow::setColumnCount(const int iIndex)
 void MainWindow::initializeGuiWidgets()
 {
     // CONNECT
-    connect(m_ui->cbRow,  &QComboBox::activated, this, &MainWindow::setRowCount);
-    connect(m_ui->cbCol,  &QComboBox::activated, this, &MainWindow::setColumnCount);
-    connect(this,  &MainWindow::transferRowCount, m_pVulkanWidget, &VulkanWidget::setRowCount);
-    connect(this,  &MainWindow::transferColumnCount, m_pVulkanWidget, &VulkanWidget::setColumnCount);
+    connect(m_ui->cbRow, &QComboBox::activated, this, &MainWindow::setRowCount);
+    connect(m_ui->cbCol, &QComboBox::activated, this, &MainWindow::setColumnCount);
+    connect(this, &MainWindow::transferRowCount, m_pVulkanWidget, &VulkanWidget::setRowCount);
+    connect(this, &MainWindow::transferColumnCount, m_pVulkanWidget, &VulkanWidget::setColumnCount);
 
+    // Set initial Row/Column count
+    emit transferRowCount(INITIAL_COUNT);
+    emit transferColumnCount(INITIAL_COUNT);
 
     // initialize cbRow
-    for (size_t i = 0; i <= MAX_ROW_COUNT; ++i) {
-        if (i >= 2) {
-            m_ui->cbRow->addItem(QString::number(i));
-        }
+    for (size_t i = INITIAL_COUNT; i <= MAX_ROW_COUNT; ++i) {
+        m_ui->cbRow->addItem(QString::number(i));
     }
 
     // initialize cbCol
-    for (size_t i = 0; i <= MAX_COLUMN_COUNT; ++i) {
-        if (i >= 2) {
-            m_ui->cbCol->addItem(QString::number(i));
-        }
+    for (size_t i = INITIAL_COUNT; i <= MAX_COLUMN_COUNT; ++i) {
+        m_ui->cbCol->addItem(QString::number(i));
     }
 }
 

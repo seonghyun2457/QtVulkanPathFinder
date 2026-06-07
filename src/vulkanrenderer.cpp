@@ -81,6 +81,7 @@ bool VulkanRenderer::initialize()
             m_uboModelViewProjection.projection[1][1] *= -1.f;
         }
 
+        /*
         {
             std::vector<Vertex> vertices1 = {
                                                 Vertex(glm::vec3(-0.9f, 0.4f, 0.f),  glm::vec3(1.f, 0.f, 0.f)),  // 0
@@ -98,7 +99,9 @@ bool VulkanRenderer::initialize()
 
             m_objects.emplace_back(Rectangle(this, vertices1));
             m_objects.emplace_back(Rectangle(this, vertices2));
+
         }
+*/
     } catch (const std::runtime_error& e) {
         printDebugInfo(e.what());
         succeded = false;
@@ -331,6 +334,11 @@ void VulkanRenderer::draw()
 
     // GET NEXT FRAME
     m_currentFrame = (m_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+}
+
+void VulkanRenderer::addRectangle(const glm::vec2 iPos, const float normalizedHalfWidth, const float normalizedHalfHeight)
+{
+    m_objects.emplace_back(Rectangle(this, iPos, normalizedHalfWidth, normalizedHalfHeight));
 }
 
 void VulkanRenderer::createVertexBuffer(const std::vector<Vertex>& iVertices,VkBuffer& oBuffer, VkDeviceMemory& oBufferMemory)
