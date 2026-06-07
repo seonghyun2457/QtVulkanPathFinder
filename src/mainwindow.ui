@@ -14,9 +14,9 @@
    <string>MainWindow</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QVBoxLayout" name="verticalLayout_2" stretch="8,2">
+   <layout class="QVBoxLayout" name="verticalLayout_2" stretch="9,1">
     <item>
-     <layout class="QHBoxLayout" name="vulkanLayout" stretch="8,2">
+     <layout class="QHBoxLayout" name="vulkanLayout" stretch="9,1">
       <property name="spacing">
        <number>6</number>
       </property>
@@ -57,6 +57,38 @@
           </item>
           <item>
            <widget class="QComboBox" name="cbCol"/>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <layout class="QVBoxLayout" name="vlRadios">
+          <item>
+           <widget class="QRadioButton" name="rbStartingPoint">
+            <property name="text">
+             <string>Starting point</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QRadioButton" name="rbDestination">
+            <property name="text">
+             <string>Destination</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QRadioButton" name="rbObstacle">
+            <property name="text">
+             <string>Obstacle</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QRadioButton" name="rbPath">
+            <property name="text">
+             <string>Path</string>
+            </property>
+           </widget>
           </item>
          </layout>
         </item>
