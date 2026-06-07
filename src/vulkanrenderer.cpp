@@ -11,6 +11,8 @@
 
 #include <algorithm>
 
+#include <glm/gtc/matrix_transform.hpp>
+
 VulkanRenderer::VulkanRenderer(VulkanWidget* window)
     : m_window(window)
 {
@@ -51,6 +53,27 @@ bool VulkanRenderer::initialize()
             createDescriptorSets();
             createSynchronization();
         }
+
+        // Set UBOModelViewProjection buffer
+        {
+
+            m_uboModelViewProjection.model = glm::mat4(1.f);
+
+            m_uboModelViewProjection.view = glm::lookAt(glm::vec3(0.f, 0.f, 1.f),
+                                                        glm::vec3(0.f, 0.f, 0.f),
+                                                        glm::vec3(0.f, 1.f, 0.f));
+
+            m_uboModelViewProjection.projection = glm::perspective(glm::radians(45.f),
+                                                                   m_extent.width / (float)m_extent.height,
+                                                                   0.1f,
+                                                                   100.f);
+
+            // GLM was designed for OpenGL, where Y coordinate of the clip coordinates is inverted.
+            // The easist way to fix this is to flip the sign on the scaling factor of the Y axis in the projection matrix.
+            m_uboModelViewProjection.projection[1][1] *= -1.f;
+        }
+
+        m_objects.emplace_back(this);
     } catch (const std::runtime_error& e) {
         printDebugInfo(e.what());
         succeded = false;
@@ -59,7 +82,7 @@ bool VulkanRenderer::initialize()
     return succeded;
 }
 
-void VulkanRenderer::cleanup(std::vector<Rectangle>& iObjects)
+void VulkanRenderer::cleanup()
 {
     Q_ASSERT(m_pDeviceFunctions != VK_NULL_HANDLE);
 
@@ -67,7 +90,7 @@ void VulkanRenderer::cleanup(std::vector<Rectangle>& iObjects)
     m_pDeviceFunctions->vkDeviceWaitIdle(m_logicalDevice);
 
     // Destroy all objects
-    iObjects.clear();
+    m_objects.clear();
 
     // Destroy descriptor pool
     if (m_descriptorPool != VK_NULL_HANDLE) {
@@ -212,9 +235,15 @@ void VulkanRenderer::recreateSwapChain()
     }
 }
 
-void VulkanRenderer::draw(const std::vector<Rectangle>& iObjects)
+void VulkanRenderer::draw()
 {
     printDebugInfo("draw");
+
+    for (size_t i = 0; i < m_objects.size(); ++i) {
+
+        // glm::mat4 modelMat = glm::rotate(glm::mat4(1.f), glm::radians(0.f), glm::vec3(0.0f, 0.0f, 1.0f));
+        // iObjects[i].setModel(modelMat);
+    }
 
     Q_ASSERT(m_pDeviceFunctions != nullptr);
 
@@ -232,7 +261,7 @@ void VulkanRenderer::draw(const std::vector<Rectangle>& iObjects)
     vkAcquireNextImageKHR(m_logicalDevice, m_swapchain, std::numeric_limits<uint64_t>::max(), m_imagesAvailable[m_currentFrame], VK_NULL_HANDLE, &imageIndex);
 
     // Update Uniform buffers
-    recordCommands(imageIndex, iObjects);
+    recordCommands(imageIndex, m_objects);
     updateUniformBuffers(imageIndex);
 
     // SUBMIT COMMAND BUFFER TO RENDERER
@@ -1247,7 +1276,7 @@ void VulkanRenderer::createGraphicsPipeline()
         pipelineRasterizationStateCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;             // how to handle filling points between vertices
         pipelineRasterizationStateCreateInfo.lineWidth = 1.f;                                // How thick lines should be when drawn
         pipelineRasterizationStateCreateInfo.cullMode = VK_CULL_MODE_BACK_BIT;               // Which face of a triangle to cull
-        pipelineRasterizationStateCreateInfo.frontFace = VK_FRONT_FACE_CLOCKWISE;            // Determine which side is front
+        pipelineRasterizationStateCreateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;    // Determine which side is front
         pipelineRasterizationStateCreateInfo.depthBiasEnable = VK_FALSE;                     // Whether to add depth bias to fragments (good for stoppoing "shadow acne" in shadow mapping)
 
         // MULTI-SAMPLING

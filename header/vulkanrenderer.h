@@ -32,11 +32,11 @@ public:
     virtual ~VulkanRenderer();
 
     bool initialize();
-    void cleanup(std::vector<Rectangle>& iObjects);
+    void cleanup();
 
     void recreateSwapChain();
 
-    void draw(const std::vector<Rectangle>& iObjects);
+    void draw();
 
     void createVertexBuffer(const std::vector<Vertex>& iVertices, VkBuffer& oBuffer, VkDeviceMemory& oBufferMemory);
     void createIndexBuffer(const std::vector<uint32_t>& iIndices, VkBuffer& oBuffer, VkDeviceMemory& oBufferMemory);
@@ -99,6 +99,9 @@ private:
     // Extension functions
     bool extensionSupported(const char* iExtension) const;
 private:
+    // Drawbale objects
+    std::vector<Rectangle> m_objects;
+
     // Window
     VulkanWidget* m_window{nullptr};
 

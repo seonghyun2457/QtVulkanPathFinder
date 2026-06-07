@@ -41,11 +41,6 @@ void VulkanWidget::exposeEvent(QExposeEvent* event)
 bool VulkanWidget::event(QEvent* e)
 {
     if (e->type() == QEvent::UpdateRequest) {
-        for (size_t i = 0; i < m_objects.size(); ++i) {
-            glm::mat4 modelMat = glm::rotate(glm::mat4(1.f), glm::radians(10.f), glm::vec3(0.0f, 1.0f, 0.0f));
-            modelMat = glm::rotate(glm::mat4(1.f), glm::radians(-90.f), glm::vec3(1.0f, 0.0f, 0.0f));
-            m_objects[i].setModel(modelMat);
-        }
         draw();
         return true;
     }
@@ -56,8 +51,8 @@ bool VulkanWidget::event(QEvent* e)
         if (surfaceEvent->surfaceEventType() == QPlatformSurfaceEvent::SurfaceAboutToBeDestroyed) {
             if (m_pVulkanRenderer) {
                 emit sendDebugInfo("clean up");
-                m_pVulkanRenderer->cleanup(m_objects);
                 m_initisialized = false;
+                m_pVulkanRenderer->cleanup();
             }
         }
     }
@@ -99,8 +94,6 @@ void VulkanWidget::initializeRenderer()
         emit sendDebugInfo("Failed to initialize Vulkan renderer");
     } else {
         emit sendDebugInfo("Succeeded to initialize Vulkan renderer");
-
-        m_objects.emplace_back(m_pVulkanRenderer.get());
     };
 }
 
@@ -109,7 +102,7 @@ void VulkanWidget::draw()
     emit sendDebugInfo("draw");
 
     if (m_pVulkanRenderer && m_initisialized) {
-        m_pVulkanRenderer->draw(m_objects);
+        m_pVulkanRenderer->draw();
     }
 
 
