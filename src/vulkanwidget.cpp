@@ -107,14 +107,14 @@ void VulkanWidget::mouseMoveEvent(QMouseEvent* event)
 
 void VulkanWidget::traceMousePosition(const QPointF& iPosition)
 {
-    const float rectangleWidth = (width() / static_cast<float>(m_rowCount));
-    const float rectangleHeight = (height() / static_cast<float>(m_colCount));
+    const float rectangleWidth = (width() / static_cast<float>(m_colCount));
+    const float rectangleHeight = (height() / static_cast<float>(m_rowCount));
 
-    const size_t rectangleRowIndex = static_cast<size_t>(iPosition.x() / rectangleWidth);
-    const size_t rectangleColIndex = static_cast<size_t>(iPosition.y() / rectangleHeight);
+    const size_t rectangleColIndex = static_cast<size_t>(iPosition.x() / rectangleWidth);
+    const size_t rectangleRowIndex = static_cast<size_t>(iPosition.y() / rectangleHeight);
 
-    if (m_occupied[(rectangleColIndex * m_rowCount) + rectangleRowIndex] == false) {
-        m_occupied[(rectangleColIndex * m_rowCount) + rectangleRowIndex] = true;
+    if (m_occupied[(rectangleRowIndex * m_colCount) + rectangleColIndex] == false) {
+        m_occupied[(rectangleRowIndex * m_colCount) + rectangleColIndex] = true;
 
         const float normalizedRectangleHalfWidth = rectangleWidth / static_cast<float>(width());
         const float normalizedRectangleHalfHeight = rectangleHeight / static_cast<float>(height());
@@ -122,8 +122,8 @@ void VulkanWidget::traceMousePosition(const QPointF& iPosition)
         float halfWidth = 0.5f * width();
         float halfHeight = 0.5f * height();
 
-        float normalizedXPos = (((rectangleRowIndex * rectangleWidth) - halfWidth) / static_cast<float>(halfWidth)) + normalizedRectangleHalfWidth;
-        float normalizedYPos = -((((rectangleColIndex * rectangleHeight) - halfHeight) / static_cast<float>(halfHeight)) + normalizedRectangleHalfHeight);
+        float normalizedXPos = (((rectangleColIndex * rectangleWidth) - halfWidth) / static_cast<float>(halfWidth)) + normalizedRectangleHalfWidth;
+        float normalizedYPos = -((((rectangleRowIndex * rectangleHeight) - halfHeight) / static_cast<float>(halfHeight)) + normalizedRectangleHalfHeight);
 
         glm::vec2 recPos{normalizedXPos, normalizedYPos};
         m_pVulkanRenderer->addRectangle(recPos, normalizedRectangleHalfWidth, normalizedRectangleHalfHeight);

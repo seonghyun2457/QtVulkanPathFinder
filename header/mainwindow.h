@@ -49,8 +49,8 @@ private:
     VulkanWidget* m_pVulkanWidget;
 
     static constexpr size_t INITIAL_COUNT{2};
-    static constexpr size_t MAX_ROW_COUNT{40};
-    static constexpr size_t MAX_COLUMN_COUNT{30};
+    static constexpr size_t MAX_ROW_COUNT{30};
+    static constexpr size_t MAX_COLUMN_COUNT{40};
 
     // Performance Metrics
     QString m_performaceMessage{""};
