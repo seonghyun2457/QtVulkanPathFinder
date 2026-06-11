@@ -9,10 +9,10 @@ Rectangle::Rectangle(VulkanRenderer* renderer, const glm::vec2& iPos, const floa
     , m_color(iColor)
 {
     m_vertices = {
-                    Vertex(glm::vec3(iPos.x - halfWidth, iPos.y + halfHeight, 0.f), m_color),  // 0
-                    Vertex(glm::vec3(iPos.x - halfWidth, iPos.y - halfHeight, 0.f), m_color),  // 1
-                    Vertex(glm::vec3(iPos.x + halfWidth, iPos.y - halfHeight, 0.f), m_color),  // 2
-                    Vertex(glm::vec3(iPos.x + halfWidth, iPos.y + halfHeight, 0.f), m_color)   // 3
+                    Vertex(glm::vec3(iPos.x - halfWidth, iPos.y + halfHeight, 0.f), m_color, glm::vec2(0.f, 0.f)),  // 0
+                    Vertex(glm::vec3(iPos.x - halfWidth, iPos.y - halfHeight, 0.f), m_color, glm::vec2(0.f, 1.f)),  // 1
+                    Vertex(glm::vec3(iPos.x + halfWidth, iPos.y - halfHeight, 0.f), m_color, glm::vec2(1.f, 1.f)),  // 2
+                    Vertex(glm::vec3(iPos.x + halfWidth, iPos.y + halfHeight, 0.f), m_color, glm::vec2(1.f, 0.f))   // 3
                  };
 
 

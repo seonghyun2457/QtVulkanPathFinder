@@ -23,6 +23,11 @@ typedef struct SwapchainImage {
     VkImageView imageView{VK_NULL_HANDLE};
 } SwapchainImage_t;
 
+typedef struct {
+    glm::vec4 color;  // COLOR: RGBA
+    glm::vec4 borderColor;
+    float borderWidth;
+} pushConstantInfo_t;
 
 class VulkanRenderer
 {

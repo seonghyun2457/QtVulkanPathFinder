@@ -1138,9 +1138,13 @@ void VulkanRenderer::recordCommands(const uint32_t iImageIndex, const std::vecto
                                                         &m_descriptorSets[iImageIndex],
                                                         0, nullptr);
 
-                // Transfer Color (RGBA) via PushConstant
-                const glm::vec4 color = glm::vec4(iObjects[i].getColor(), 1.f);
-                m_pDeviceFunctions->vkCmdPushConstants(commandBuffer, m_pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(glm::vec4), &color);
+                // Transfer pushConstantInfo_t to Fragment shader via PushConstant
+                pushConstantInfo_t pushConstInfo{};
+                pushConstInfo.color = glm::vec4(iObjects[i].getColor(), 1.f);
+                pushConstInfo.borderColor = glm::vec4(0.3f, 0.3f, 0.3f, 0.5f);
+                pushConstInfo.borderWidth = 0.05f;
+
+                m_pDeviceFunctions->vkCmdPushConstants(commandBuffer, m_pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pushConstantInfo_t), &pushConstInfo);
 
                 // Draw by index
                 m_pDeviceFunctions->vkCmdDrawIndexed(commandBuffer, iObjects[i].getIndexCount(), 1, 0, 0, 0);
@@ -1304,7 +1308,7 @@ void VulkanRenderer::createPushConstantRange()
 {
     m_pushConstantRange.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT; // Send PushConstant to fragment shader
     m_pushConstantRange.offset = 0;
-    m_pushConstantRange.size = sizeof(glm::vec4); // COLOR: RGBA
+    m_pushConstantRange.size = sizeof(pushConstantInfo_t);
 }
 
 void VulkanRenderer::createGraphicsPipeline()
@@ -1353,7 +1357,7 @@ void VulkanRenderer::createGraphicsPipeline()
         vertexbindingDescption.inputRate = VK_VERTEX_INPUT_RATE_VERTEX; // How to move between data after each vertex
 
         // How the data for an attribute is defined within a vertex
-        std::array<VkVertexInputAttributeDescription, 2> vertexInputAttributesDescripotions;
+        std::array<VkVertexInputAttributeDescription, 3> vertexInputAttributesDescripotions;
 
         // Position attribute
         // layout(location = 0) in vec3 pos in Vertex Shader
@@ -1368,6 +1372,13 @@ void VulkanRenderer::createGraphicsPipeline()
         vertexInputAttributesDescripotions[1].location = 1;                        // Location in shader where data will be read from
         vertexInputAttributesDescripotions[1].format = VK_FORMAT_R32G32B32_SFLOAT; // Formate the data will take (also helps to define the size of data). 12 bytes.
         vertexInputAttributesDescripotions[1].offset = offsetof(Vertex, col);      // Where this attribute is defined in the data for a single vertex
+
+        // UV attribute
+        // layout(location = 2) in vec2 uv in Vertex Shader
+        vertexInputAttributesDescripotions[2].binding = 0;
+        vertexInputAttributesDescripotions[2].location = 2;
+        vertexInputAttributesDescripotions[2].format = VK_FORMAT_R32G32_SFLOAT; // 8 bytes for UV
+        vertexInputAttributesDescripotions[2].offset = offsetof(Vertex, uv);
 
         // VERTEX INPUT STATE
         VkPipelineVertexInputStateCreateInfo vertexInputStateCreateInfo{};

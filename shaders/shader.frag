@@ -1,14 +1,45 @@
 #version 450
 
 layout(location = 0) in vec3 fragCol;
+layout(location = 1) in vec2 fragUv;
 
 layout(location = 0) out vec4 outColor; // Final output color (must also have location)
 
-layout(push_constant) uniform PushConstants {
+layout(std140, push_constant) uniform PushConstants {
 	vec4 color;
+	vec4 borderColor;
+	float borderWidth;
 } pc;
 
 void main() 
 {
-	outColor = pc.color;
+	// fwidth(): the sum of the absolute values of the approximate partial derivatives of a value
+	// with respect to the window-space X and Y coordinates
+	vec2 fw = fwidth(fragUv);
+
+	// pixel size of rectangle
+	vec2 rectSizePx = 1.f / fw;
+
+	float refPx = min(rectSizePx.x, rectSizePx.y);
+
+	// thikness of border at pixel level
+	float borderPx = pc.borderWidth * refPx;
+
+
+	// UV distance to the closest outout
+	float distUvX = min(fragUv.x, 1.f - fragUv.x);
+	float distUvY = min(fragUv.y, 1.f - fragUv.y);
+
+	// convert distance unit: UV -> pixel
+	float distPxX = distUvX / fw.x;
+	float distPxY = distUvY / fw.y;
+
+	float minDistPx = min(distPxX, distPxY);
+
+
+	if (minDistPx < borderPx) {
+		outColor = pc.borderColor;
+	} else {
+		outColor = pc.color;
+	}
 }
