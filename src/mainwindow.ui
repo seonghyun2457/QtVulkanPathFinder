@@ -31,69 +31,90 @@
        </widget>
       </item>
       <item>
-       <layout class="QVBoxLayout" name="verticalLayout">
+       <layout class="QVBoxLayout" name="verticalLayout" stretch="1,8,0,0">
         <item>
-         <layout class="QHBoxLayout" name="hlRow">
-          <item>
-           <widget class="QLabel" name="lbRowCount">
-            <property name="text">
-             <string>Row count:</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QComboBox" name="cbRow"/>
-          </item>
-         </layout>
+         <widget class="QGroupBox" name="gbTspSize">
+          <property name="title">
+           <string>TSP size</string>
+          </property>
+          <layout class="QFormLayout" name="formLayout">
+           <item row="1" column="0">
+            <widget class="QLabel" name="lbColumnCount">
+             <property name="text">
+              <string>Columns:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="1">
+            <widget class="QComboBox" name="cbCol"/>
+           </item>
+           <item row="0" column="0">
+            <widget class="QLabel" name="lbRowCount">
+             <property name="text">
+              <string>Rows:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="1">
+            <widget class="QComboBox" name="cbRow"/>
+           </item>
+          </layout>
+         </widget>
         </item>
         <item>
-         <layout class="QHBoxLayout" name="hlCol">
-          <item>
-           <widget class="QLabel" name="lbColCount">
-            <property name="text">
-             <string>Column count:</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QComboBox" name="cbCol"/>
-          </item>
-         </layout>
+         <widget class="QGroupBox" name="gbNodeSettings">
+          <property name="title">
+           <string>Node settings</string>
+          </property>
+          <layout class="QGridLayout" name="gridLayout">
+           <item row="0" column="0">
+            <widget class="QRadioButton" name="rbStartingNode">
+             <property name="text">
+              <string>Starting node</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="0">
+            <widget class="QRadioButton" name="rbBlockingNode">
+             <property name="text">
+              <string>Blocking node</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="0">
+            <widget class="QRadioButton" name="rbEndingNode">
+             <property name="text">
+              <string>Ending node</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="1">
+            <widget class="ColorSwatch" name="csStartingNode" native="true"/>
+           </item>
+           <item row="1" column="1">
+            <widget class="ColorSwatch" name="csEndingNode" native="true"/>
+           </item>
+           <item row="2" column="1">
+            <widget class="ColorSwatch" name="csBlockingingNode" native="true"/>
+           </item>
+           <item row="3" column="0">
+            <widget class="QRadioButton" name="rbMovableNode">
+             <property name="text">
+              <string>Movable node</string>
+             </property>
+             <property name="checked">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+           <item row="3" column="1">
+            <widget class="ColorSwatch" name="csMovableNode" native="true"/>
+           </item>
+          </layout>
+         </widget>
         </item>
         <item>
-         <layout class="QVBoxLayout" name="vlRadios">
-          <item>
-           <widget class="QRadioButton" name="rbStartingPoint">
-            <property name="text">
-             <string>Starting point</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QRadioButton" name="rbDestination">
-            <property name="text">
-             <string>Destination</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QRadioButton" name="rbObstacle">
-            <property name="text">
-             <string>Obstacle</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QRadioButton" name="rbPath">
-            <property name="text">
-             <string>Path</string>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </item>
-        <item>
-         <widget class="QPushButton" name="pushButton">
+         <widget class="QPushButton" name="btnColorDialog">
           <property name="text">
            <string>PushButton</string>
           </property>
@@ -141,6 +162,14 @@
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>ColorSwatch</class>
+   <extends>QWidget</extends>
+   <header location="global">colorswatch.h</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
 </ui>

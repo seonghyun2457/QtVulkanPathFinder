@@ -40,6 +40,9 @@ private slots:
     // Row & Column slot
     void on_cbRow_activated(const int iIndex);
     void on_cbCol_activated(const int iIndex);
+
+    // Test
+    //void on_btnColorDialog_clicked();
 private:
     void initializeGuiWidgets();
     void initializeVulkanWidget();

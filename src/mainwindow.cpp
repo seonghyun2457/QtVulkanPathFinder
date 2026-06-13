@@ -19,6 +19,18 @@ MainWindow::MainWindow(QWidget *parent)
 
     initializeGuiWidgets();
     initializeVulkanWidget();
+
+    // TEST
+    /*
+    m_ui->testWidget->setAutoFillBackground(true);
+    m_ui->testWidget->setCursor(Qt::PointingHandCursor);
+    auto palette = m_ui->testWidget->palette();
+    palette.setColor(QPalette::Window, Qt::black);
+    m_ui->testWidget->setPalette(palette);
+
+    qDebug() << "m_ui->testWidget->backgroundRole(): " << m_ui->testWidget->backgroundRole();
+    */
+
 }
 
 MainWindow::~MainWindow()
@@ -79,6 +91,20 @@ void MainWindow::on_cbCol_activated(const int iIndex)
     const uint32_t columnCount = m_ui->cbCol->itemText(iIndex).toUInt(&ok);
     if (ok) emit transferColumnCount(columnCount);
 }
+
+/*
+void MainWindow::on_btnColorDialog_clicked()
+{
+    qDebug() << "test test";
+    const QColor currentColor = m_ui->testWidget->palette().color(m_ui->testWidget->backgroundRole());
+    const QColor color = QColorDialog::getColor(currentColor);
+    if (color.isValid()) {
+        auto palette = m_ui->testWidget->palette();
+        palette.setColor(QPalette::Window, color);
+        m_ui->testWidget->setPalette(palette);
+    }
+}
+*/
 
 void MainWindow::initializeGuiWidgets()
 {
