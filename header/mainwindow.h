@@ -66,7 +66,7 @@ private:
     static constexpr uint32_t MAX_COLUMN_SIZE{40};
 
     // Performance Metrics
-    QString m_performaceMessage{""};
+    static const QString s_performaceMessage;
     float m_gpuTime{0.f};
     float m_cpuFps{0.f};
 };

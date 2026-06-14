@@ -53,6 +53,20 @@ void VulkanWidget::setColorSetting(const eNodeStatus iNodeStatus, glm::vec3 iCol
 
 void VulkanWidget::changeNodeStatus(const uint32_t iIndex)
 {
+    if (m_selectedNodeStatus == eNodeStatus::startingNode) {
+        if (m_startingNodeIndex < m_nodes.size()) {
+            m_nodes[m_startingNodeIndex].setNodeStatus(eNodeStatus::movableNode);
+            m_nodes[m_startingNodeIndex].setColor(m_colors[eNodeStatus::movableNode]);
+        }
+        m_startingNodeIndex = iIndex;
+    } else if (m_selectedNodeStatus == eNodeStatus::endingNode) {
+        if (m_endingNodeIndex < m_nodes.size()) {
+            m_nodes[m_endingNodeIndex].setNodeStatus(eNodeStatus::movableNode);
+            m_nodes[m_endingNodeIndex].setColor(m_colors[eNodeStatus::movableNode]);
+        }
+        m_endingNodeIndex = iIndex;
+    }
+
     m_nodes[iIndex].setNodeStatus(m_selectedNodeStatus);
     m_nodes[iIndex].setColor(m_colors[m_selectedNodeStatus]);
 }

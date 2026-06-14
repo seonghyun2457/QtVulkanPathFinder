@@ -7,20 +7,20 @@
 #include <QPlainTextEdit>
 #include <QDebug>
 
+const QString MainWindow::s_performaceMessage = "Qt + Vulkan TSP - [CPU FPS: %1 (%2ms/frame), GPU FPS equiv: %3 (%4ms/frame)]";
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , m_ui(std::make_unique<Ui::MainWindow>())
     , m_solver(std::make_unique<TSPSolver>())
     , m_pVulkanWidget(std::make_unique<VulkanWidget>())
-    , m_performaceMessage("Qt + Vulkan TSP - [CPU FPS: %1 (%2ms/frame), GPU FPS equiv: %3 (%4ms/frame)]")
 {
     m_ui->setupUi(this);
 
-    m_performaceMessage.reserve(256);
-
-    initializeGuiWidgets();
     initializeVulkanWidget();
+    initializeGuiWidgets();
     initializeColorSwatch();
+    initializeSolver();
 }
 
 MainWindow::~MainWindow()
@@ -71,7 +71,7 @@ void MainWindow::displayPerformace()
     const float cpuMsPerFrame = (m_cpuFps > 0.f) ? (1000.f / m_cpuFps) : 0.f;
     const float gpuFpsEquiv = (m_gpuTime > 0.f) ? (1000.f / m_gpuTime) : 0.f;
 
-    setWindowTitle(m_performaceMessage.arg(m_cpuFps, 0, 'f', 3).arg(cpuMsPerFrame, 0, 'f', 3).arg(gpuFpsEquiv, 0, 'f', 3).arg(m_gpuTime, 0, 'f', 3));
+    setWindowTitle(s_performaceMessage.arg(m_cpuFps, 0, 'f', 3).arg(cpuMsPerFrame, 0, 'f', 3).arg(gpuFpsEquiv, 0, 'f', 3).arg(m_gpuTime, 0, 'f', 3));
 }
 
 void MainWindow::on_cbRow_activated(const int iIndex)
@@ -190,8 +190,17 @@ void MainWindow::initializeColorSwatch()
     connect(m_ui->csStartingNode, &ColorSwatch::colorSelcted, m_pVulkanWidget.get(), &VulkanWidget::setColorSetting);
     connect(m_ui->csEndingNode, &ColorSwatch::colorSelcted, m_pVulkanWidget.get(), &VulkanWidget::setColorSetting);
 
+    // Set colors
     m_ui->csMovableNode->initialize(eNodeStatus::movableNode, Qt::black);
     m_ui->csBlockingingNode->initialize(eNodeStatus::blockingNode, Qt::red);
     m_ui->csStartingNode->initialize(eNodeStatus::startingNode, Qt::yellow);
     m_ui->csEndingNode->initialize(eNodeStatus::endingNode, Qt::green);
+
+    // Click Blocking button
+    m_ui->rbBlockingNode->click();
+}
+
+void MainWindow::initializeSolver()
+{
+
 }
