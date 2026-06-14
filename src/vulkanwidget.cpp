@@ -1,16 +1,14 @@
 #include "vulkanwidget.h"
 
+#include <QDebug>
+#include <QExposeEvent>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-
-#include <QExposeEvent>
-#include <QDebug>
 
 #include "tspsolver.h"
 
 VulkanWidget::VulkanWidget()
-    : QWindow()
-    , m_pVulkanRenderer(nullptr)
+    : QWindow(), m_pVulkanRenderer(nullptr)
 {
     setSurfaceType(QWindow::VulkanSurface);
 
@@ -207,7 +205,7 @@ void VulkanWidget::draw()
         auto currentTime = std::chrono::high_resolution_clock::now();
 
         if (m_hasLastFrameTime) {
-            const float deltaTime = std::chrono::duration<float>(currentTime - m_lastFrameTime).count(); // in second
+            const float deltaTime = std::chrono::duration<float>(currentTime - m_lastFrameTime).count();  // in second
             updatePerformanceMetrics(deltaTime);
         }
 
@@ -215,11 +213,9 @@ void VulkanWidget::draw()
         m_hasLastFrameTime = true;
     }
 
-
     if (isExposed()) {
         requestUpdate();
     }
-
 }
 
 void VulkanWidget::updatePerformanceMetrics(const float iDeltaTime)
@@ -255,4 +251,3 @@ void VulkanWidget::resetNodes()
         m_pVulkanRenderer->resetNodes(m_rowSize, m_colSize, m_colors[eNodeStatus::movableNode], m_nodes);
     }
 }
-

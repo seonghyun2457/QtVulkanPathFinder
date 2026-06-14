@@ -1,17 +1,16 @@
 #include "mainwindow.h"
-#include "ui_mainwindow.h"
-
-#include <QVulkanWindow>
 
 #include <QColorDialog>
-#include <QPlainTextEdit>
 #include <QDebug>
+#include <QPlainTextEdit>
+#include <QVulkanWindow>
 
 #include "eSolver.h"
+#include "ui_mainwindow.h"
 
 const QString MainWindow::s_performaceMessage = "Qt + Vulkan TSP - [CPU FPS: %1 (%2ms/frame), GPU FPS equiv: %3 (%4ms/frame)]";
 
-MainWindow::MainWindow(QWidget *parent)
+MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
     , m_ui(std::make_unique<Ui::MainWindow>())
     , m_pVulkanWidget(std::make_unique<VulkanWidget>())
@@ -31,23 +30,22 @@ MainWindow::~MainWindow()
     qDebug() << "destroyed m_pVulkanWidget";
 }
 
-void MainWindow::displayVulkanInfo(const QString &iVulkanInfo)
+void MainWindow::displayVulkanInfo(const QString& iVulkanInfo)
 {
     m_ui->vulkanInfo->appendPlainText(iVulkanInfo);
 }
 
-void MainWindow::displayDebugInfo(const QString &iDebugInfo)
+void MainWindow::displayDebugInfo(const QString& iDebugInfo)
 {
     m_ui->debugLog->appendPlainText(iDebugInfo);
 }
 
-void MainWindow::onMousePressed(const QPointF &position)
+void MainWindow::onMousePressed(const QPointF& position)
 {
     displayDebugInfo(QString("Mouse clicked at (%1, %2)").arg(position.x()).arg(position.y()));
 }
 
-void MainWindow::onMouseMoved(const QPointF &position)
-{
+void MainWindow::onMouseMoved(const QPointF& position) {
     displayDebugInfo(QString("Mouse moved to (%1, %2)").arg(position.x()).arg(position.y()));
 }
 
@@ -121,16 +119,6 @@ void MainWindow::on_btnSolve_clicked()
     m_pVulkanWidget->solve();
 }
 
-void MainWindow::setDijkstra()
-{
-    m_pVulkanWidget->setSolver(eSolver::Dijkstra);
-}
-
-void MainWindow::setAstar()
-{
-    m_pVulkanWidget->setSolver(eSolver::AStar);
-}
-
 void MainWindow::initializeGuiWidgets()
 {
     // CONNECT
@@ -152,7 +140,6 @@ void MainWindow::initializeGuiWidgets()
     }
 }
 
-
 void MainWindow::initializeVulkanWidget()
 {
     if (!m_pVulkanWidget) {
@@ -171,7 +158,6 @@ void MainWindow::initializeVulkanWidget()
     connect(m_pVulkanWidget.get(), &VulkanWidget::mousePressed, this, &MainWindow::onMousePressed);
     connect(m_pVulkanWidget.get(), &VulkanWidget::mouseMoved, this, &MainWindow::onMouseMoved);
 
-
     qDebug() << "m_pVulkanWidget->width(): " << m_pVulkanWidget->width();
     qDebug() << "m_pVulkanWidget->height(): " << m_pVulkanWidget->height();
 
@@ -183,7 +169,7 @@ void MainWindow::initializeVulkanWidget()
 
     // Window Container
     QWidget* pWindowContainer = QWidget::createWindowContainer(m_pVulkanWidget.get(), m_ui->vulkanWindow->parentWidget());
-    //pWindowContainer->setMouseTracking(true);
+    // pWindowContainer->setMouseTracking(true);
     pWindowContainer->setSizePolicy(m_ui->vulkanWindow->sizePolicy());
     pWindowContainer->setMinimumSize(m_ui->vulkanWindow->minimumSize());
 
@@ -221,6 +207,5 @@ void MainWindow::initializeColorSwatch()
 
 void MainWindow::initializeSolver()
 {
-    connect(m_ui->rbSolverDijkstra, &QAbstractButton::clicked, this, &MainWindow::setDijkstra);
-    connect(m_ui->rbSolverDijkstra, &QAbstractButton::clicked, this, &MainWindow::setAstar);
+    connect(m_ui->gbSolver, &GroupSolver::solverChanged, m_pVulkanWidget.get(), &VulkanWidget::setSolver);
 }

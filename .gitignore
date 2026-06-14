@@ -59,6 +59,7 @@ compile_commands.json
 
 #cmake
 CMakeCache.txt
+/CMakeFiles
 
 #vscode
 /.vscode

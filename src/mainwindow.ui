@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>986</width>
+    <width>998</width>
     <height>586</height>
    </rect>
   </property>
@@ -62,26 +62,10 @@
          </widget>
         </item>
         <item>
-         <widget class="QGroupBox" name="SolvingAlgorithms">
+         <widget class="GroupSolver" name="gbSolver">
           <property name="title">
-           <string>Solving algorithms</string>
+           <string>solving algorithms</string>
           </property>
-          <layout class="QVBoxLayout" name="verticalLayout_3">
-           <item>
-            <widget class="QRadioButton" name="rbSolverAstar">
-             <property name="text">
-              <string>A*</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QRadioButton" name="rbSolverDijkstra">
-             <property name="text">
-              <string>Dijkstra</string>
-             </property>
-            </widget>
-           </item>
-          </layout>
          </widget>
         </item>
         <item>
@@ -182,7 +166,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>986</width>
+     <width>998</width>
      <height>21</height>
     </rect>
    </property>
@@ -194,6 +178,12 @@
    <class>ColorSwatch</class>
    <extends>QWidget</extends>
    <header location="global">colorswatch.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>GroupSolver</class>
+   <extends>QGroupBox</extends>
+   <header location="global">GroupSolver.h</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

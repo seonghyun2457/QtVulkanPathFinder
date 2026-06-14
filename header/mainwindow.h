@@ -1,10 +1,12 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
+#include <GroupSolver.h>
+
 #include <QMainWindow>
 
-#include "vulkanwidget.h"
 #include "tspsolver.h"
+#include "vulkanwidget.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -12,12 +14,11 @@ class MainWindow;
 }
 QT_END_NAMESPACE
 
-class MainWindow : public QMainWindow
-{
+class MainWindow : public QMainWindow {
     Q_OBJECT
 
 public:
-    MainWindow(QWidget *parent = nullptr);
+    MainWindow(QWidget* parent = nullptr);
     virtual ~MainWindow();
 
 signals:
@@ -51,8 +52,6 @@ private slots:
     // TSP slots
     void on_btnReset_clicked();
     void on_btnSolve_clicked();
-    void setDijkstra();
-    void setAstar();
 
 private:
     void initializeGuiWidgets();
@@ -73,4 +72,4 @@ private:
     float m_gpuTime{0.f};
     float m_cpuFps{0.f};
 };
-#endif // MAINWINDOW_H
+#endif  // MAINWINDOW_H
