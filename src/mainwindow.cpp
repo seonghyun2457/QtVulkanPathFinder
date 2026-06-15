@@ -91,13 +91,13 @@ void MainWindow::nodeStatusSelected(const eNodeStatus iNodeStatus)
 
 void MainWindow::on_btnReset_clicked()
 {
-    displayDebugInfo("Reset");
+    displayDebugInfo("Reset button clicked");
     m_pVulkanWidget->wipeScreen();
 }
 
 void MainWindow::on_btnSolve_clicked()
 {
-    displayDebugInfo("Solve");
+    displayDebugInfo("Solve button clicked");
     m_pVulkanWidget->solve();
 }
 

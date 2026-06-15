@@ -34,15 +34,20 @@ void VulkanWidget::wipeScreen()
         m_nodes[i].setColor(m_colors[eNodeStatus::movableNode]);
         m_nodes[i].setVisited(false);
     }
+
+    sendDebugInfo(QString("Cleared screen. Screen is unblocked."));
 }
 
 void VulkanWidget::setSelectedNodeStatus(const eNodeStatus iNodeStatus)
 {
     m_selectedNodeStatus = iNodeStatus;
+
+    sendDebugInfo(QString("Selected node status: %1").arg(static_cast<int>(m_selectedNodeStatus)));
 }
 
 void VulkanWidget::solve()
 {
+    sendDebugInfo(QString("Solve TSP problem. Solving algorithm: %1. Screen is blocked.").arg(static_cast<int>(m_solver)));
     bool solutionFound = TSPSolver::solve(m_solver, m_startingNodeIndex, m_endingNodeIndex, m_rowSize, m_colSize, m_nodes);
 
     m_screenBlocked = true;
@@ -52,12 +57,16 @@ void VulkanWidget::setRowSize(const uint32_t iRowSize)
 {
     m_rowSize = iRowSize;
     resetNodes();
+
+    sendDebugInfo(QString("Row size changed to %1").arg(m_rowSize));
 }
 
 void VulkanWidget::setColumnSize(const uint32_t iColumnSize)
 {
     m_colSize = iColumnSize;
     resetNodes();
+
+    sendDebugInfo(QString("Column size changed to %1").arg(m_colSize));
 }
 
 void VulkanWidget::setColorSetting(const eNodeStatus iNodeStatus, const glm::vec3 iColor)
@@ -69,6 +78,7 @@ void VulkanWidget::setColorSetting(const eNodeStatus iNodeStatus, const glm::vec
             node.setColor(m_colors[iNodeStatus]);
         }
     }
+    sendDebugInfo(QString("Node status %1's color changed to RGB(%2, %3, %4)").arg(static_cast<int>(iNodeStatus)).arg(iColor.r).arg(iColor.g).arg(iColor.b));
 }
 
 void VulkanWidget::changeNodeStatus(const uint32_t iIndex)
@@ -104,6 +114,7 @@ void VulkanWidget::changeNodeStatus(const uint32_t iIndex)
 void VulkanWidget::setSolver(const eSolver iSolver)
 {
     m_solver = iSolver;
+    sendDebugInfo(QString("Solver changed to %1").arg(static_cast<int>(m_solver)));
 }
 
 void VulkanWidget::exposeEvent(QExposeEvent* event)
@@ -185,8 +196,6 @@ void VulkanWidget::traceMousePosition(const QPointF& iPosition)
     const size_t index = (rectangleRowIndex * m_colSize) + rectangleColIndex;
 
     changeNodeStatus(index);
-
-    emit sendDebugInfo("change Rectangle color");
 }
 
 void VulkanWidget::initializeRenderer()

@@ -14,7 +14,7 @@
    <string>MainWindow</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QVBoxLayout" name="verticalLayout_2" stretch="9,1">
+   <layout class="QVBoxLayout" name="verticalLayout_2" stretch="5,5">
     <item>
      <layout class="QHBoxLayout" name="vulkanLayout" stretch="9,1">
       <property name="spacing">
@@ -31,7 +31,7 @@
        </widget>
       </item>
       <item>
-       <layout class="QVBoxLayout" name="verticalLayout" stretch="1,0,8,0">
+       <layout class="QVBoxLayout" name="verticalLayout" stretch="2,2,8,2">
         <item>
          <widget class="QGroupBox" name="gbTspSize">
           <property name="title">
