@@ -88,8 +88,14 @@ void VulkanWidget::changeNodeStatus(const uint32_t iIndex)
         }
 
         m_endingNodeIndex = iIndex;
-
+    } else {
+        if (m_startingNodeIndex == iIndex && iIndex < m_nodes.size()) {
+            m_startingNodeIndex = static_cast<uint32_t>(-1);
+        } else if(m_endingNodeIndex == iIndex && iIndex < m_nodes.size()) {
+            m_endingNodeIndex = static_cast<uint32_t>(-1);
+        }
     }
+
 
     m_nodes[iIndex].setNodeStatus(m_selectedNodeStatus);
     m_nodes[iIndex].setColor(m_colors[m_selectedNodeStatus]);
