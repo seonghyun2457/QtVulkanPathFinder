@@ -16,6 +16,7 @@ bool PathFinder::solve(const eSolver iSolver, const uint32_t iStartingIndex, con
 
     switch (iSolver) {
     case eSolver::BFS:
+        solutionFound = bfs(iStartingIndex, iEndingIndex, iRowSize, iColumnSize, iNodes, oPaths);
         break;
     case eSolver::DFS:
         break;
@@ -32,14 +33,64 @@ bool PathFinder::solve(const eSolver iSolver, const uint32_t iStartingIndex, con
     return solutionFound;
 }
 
-bool PathFinder::bfs()
+bool PathFinder::bfs(const uint32_t iStartingIndex, const uint32_t iEndingIndex, const uint32_t iRowSize, const uint32_t iColumnSize, std::vector<Node> &iNodes, std::list<uint32_t>& oPaths)
 {
+    bool found = false;
+    std::vector<uint32_t> distances(iNodes.size(), 0);
 
+    // to - from
+    std::map<uint32_t, uint32_t> prevs;
+
+    std::queue<uint32_t> queue;
+    queue.push(iStartingIndex);
+
+    while (!queue.empty()) {
+        const uint32_t next = queue.front();
+        queue.pop();
+
+        const uint32_t distance = distances[next];
+
+        if (next == iEndingIndex) {
+            found = true;
+            break;
+        }
+
+        std::vector<uint32_t> neighborIndices = getNeighborIndices(iRowSize, iColumnSize, next, iNodes);
+        for (const uint32_t neighbor : neighborIndices) {
+            if (distances[neighbor] == 0) {
+                queue.push(neighbor);
+                distances[neighbor] = distance + 1;
+
+                prevs[neighbor] = next;
+            }
+        }
+    }
+
+    uint32_t prevIndex = iEndingIndex;
+    oPaths.push_back(prevIndex);
+
+    while (prevs.find(prevIndex) != prevs.end()) {
+        uint32_t tmp = prevs[prevIndex];
+        prevIndex = tmp;
+
+        oPaths.push_back(prevIndex);
+
+        if (prevIndex == iStartingIndex) {
+            found = true;
+            break;
+        }
+    }
+
+    if (!found) {
+        oPaths.clear();
+    }
+
+    return found;
 }
 
 bool PathFinder::dfs()
 {
-
+    return true;
 }
 
 bool PathFinder::dijkstra(const uint32_t iStartingIndex, const uint32_t iEndingIndex, const uint32_t iRowSize, const uint32_t iColumnSize, std::vector<Node> &iNodes, std::list<uint32_t>& oPaths)
@@ -64,11 +115,7 @@ bool PathFinder::dijkstra(const uint32_t iStartingIndex, const uint32_t iEndingI
         open.pop();
 
         const uint32_t candidateIndex = candidate.first;
-
-        const uint32_t indexX = candidateIndex % iColumnSize;
-        const uint32_t indexY = candidateIndex / iColumnSize;
-
-        std::pair<int32_t, int32_t> from(indexX, indexY);
+        std::pair<int32_t, int32_t> from = getIndex2D(iColumnSize, candidateIndex);
 
         const uint32_t minDist = minDists[candidateIndex];
         const uint32_t dist = candidate.second;
@@ -77,14 +124,10 @@ bool PathFinder::dijkstra(const uint32_t iStartingIndex, const uint32_t iEndingI
             continue;
         }
 
-        std::vector<uint32_t> neighborIndices = getNeighborIndices(iRowSize, iColumnSize, indexX, indexY, iNodes);
+        std::vector<uint32_t> neighborIndices = getNeighborIndices(iRowSize, iColumnSize, candidateIndex, iNodes);
 
         for (const uint32_t neighborIndex: neighborIndices) {
-
-            const uint32_t neighborIndexX = neighborIndex % iColumnSize;
-            const uint32_t neighborIndexY = neighborIndex / iColumnSize;
-
-            std::pair<int32_t, int32_t> to(neighborIndexX, neighborIndexY);
+            std::pair<int32_t, int32_t> to = getIndex2D(iColumnSize, neighborIndex);
 
             const uint32_t newDist = minDist + getDistance(from, to);
             const uint32_t nextMinDist = minDists[neighborIndex];
@@ -127,30 +170,32 @@ bool PathFinder::aStar(const uint32_t iStartingIndex, const uint32_t iEndingInde
     return true;
 }
 
-std::vector<uint32_t> PathFinder::getNeighborIndices(const uint32_t iRowSize, const uint32_t iColumnSize, const uint32_t iIndexX, const uint32_t iIndexY, std::vector<Node>& iNodes)
+std::vector<uint32_t> PathFinder::getNeighborIndices(const uint32_t iRowSize, const uint32_t iColumnSize, const uint32_t iNodeIndex, std::vector<Node>& iNodes)
 {
     std::vector<uint32_t> neighborIndices;
 
+    const std::pair<uint32_t, uint32_t> index2D = getIndex2D(iColumnSize, iNodeIndex);
+
     // Left neighbor
-    std::pair<uint32_t, uint32_t> leftNeighbor(iIndexX - 1, iIndexY);
+    std::pair<uint32_t, uint32_t> leftNeighbor(index2D.first - 1, index2D.second);
     if (leftNeighbor.first < iColumnSize && iNodes[leftNeighbor.second * iColumnSize  + leftNeighbor.first].getNodeStatus() != eNodeStatus::blockingNode) {
         neighborIndices.push_back(leftNeighbor.second * iColumnSize  + leftNeighbor.first);
     }
 
     // Right neighbor
-    std::pair<uint32_t, uint32_t> rightNeighbor(iIndexX + 1, iIndexY);
+    std::pair<uint32_t, uint32_t> rightNeighbor(index2D.first + 1, index2D.second);
     if (rightNeighbor.first < iColumnSize && iNodes[rightNeighbor.second * iColumnSize  + rightNeighbor.first].getNodeStatus() != eNodeStatus::blockingNode) {
         neighborIndices.push_back(rightNeighbor.second * iColumnSize  + rightNeighbor.first);
     }
 
     // Upper neighbor
-    std::pair<uint32_t, uint32_t> upperNeighbor(iIndexX, iIndexY - 1);
+    std::pair<uint32_t, uint32_t> upperNeighbor(index2D.first, index2D.second - 1);
     if (upperNeighbor.second < iRowSize && iNodes[upperNeighbor.second * iColumnSize  + upperNeighbor.first].getNodeStatus() != eNodeStatus::blockingNode) {
         neighborIndices.push_back(upperNeighbor.second * iColumnSize  + upperNeighbor.first);
     }
 
     // Bottom neighbor
-    std::pair<uint32_t, uint32_t> bottomNeighbor(iIndexX, iIndexY + 1);
+    std::pair<uint32_t, uint32_t> bottomNeighbor(index2D.first, index2D.second + 1);
     if (bottomNeighbor.second < iRowSize && iNodes[bottomNeighbor.second * iColumnSize  + bottomNeighbor.first].getNodeStatus() != eNodeStatus::blockingNode) {
         neighborIndices.push_back(bottomNeighbor.second * iColumnSize  + bottomNeighbor.first);
     }
@@ -158,8 +203,13 @@ std::vector<uint32_t> PathFinder::getNeighborIndices(const uint32_t iRowSize, co
     return neighborIndices;
 }
 
-const uint32_t PathFinder::getDistance(const std::pair<int32_t, int32_t> iFrom, const std::pair<int32_t, int32_t> iTo)
+const uint32_t PathFinder::getDistance(const std::pair<int32_t, int32_t> iSrcIndex2D, const std::pair<int32_t, int32_t> iDstIndex2D)
 {
-    return std::abs(iFrom.first - iTo.first) + std::abs(iFrom.second - iTo.second);
+    return std::abs(iSrcIndex2D.first - iDstIndex2D.first) + std::abs(iSrcIndex2D.second - iDstIndex2D.second);
+}
+
+const std::pair<uint32_t, uint32_t> PathFinder::getIndex2D(const uint32_t iColumnSize, const uint32_t iIndex)
+{
+    return std::pair<uint32_t, uint32_t>(iIndex % iColumnSize, iIndex / iColumnSize);
 }
 

@@ -176,7 +176,7 @@ void VulkanWidget::resizeEvent(QResizeEvent* event)
 
 void VulkanWidget::mousePressEvent(QMouseEvent* event)
 {
-    if (event->button() == Qt::LeftButton) {
+    if (!m_screenBlocked && (event->button() == Qt::LeftButton)) {
         traceMousePosition(event->position());
 
         emit mousePressed(event->position());
@@ -186,7 +186,7 @@ void VulkanWidget::mousePressEvent(QMouseEvent* event)
 
 void VulkanWidget::mouseMoveEvent(QMouseEvent* event)
 {
-    if (event->buttons() & Qt::LeftButton) {
+    if (!m_screenBlocked && (event->buttons() & Qt::LeftButton)) {
         const QPointF mousePosition = event->position();
         if ((0.f <= mousePosition.x() && mousePosition.x() <= static_cast<double>(width())) &&
             (0.f <= mousePosition.y() && mousePosition.y() <= static_cast<double>(height()))) {
