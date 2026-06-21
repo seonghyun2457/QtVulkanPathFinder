@@ -14,7 +14,8 @@ public:
     VulkanWidget();
     virtual ~VulkanWidget();
 
-    void wipeScreen();
+    void clearScreen();
+    void resetSolution();
 
     void setSelectedNodeStatus(const eNodeStatus iNodeStatus);
 

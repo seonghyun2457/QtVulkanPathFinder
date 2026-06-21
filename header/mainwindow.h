@@ -47,8 +47,9 @@ private slots:
     void nodeStatusSelected(const eNodeStatus iNodeStatus);
 
     // TSP slots
-    void on_btnReset_clicked();
     void on_btnSolve_clicked();
+    void on_btnReset_clicked();
+    void on_btnClear_clicked();
 
 private:
     void initializeGuiWidgets();

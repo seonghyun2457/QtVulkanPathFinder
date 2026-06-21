@@ -28,7 +28,7 @@ VulkanWidget::~VulkanWidget()
     qDebug() << "VulkanWidget destroyed";
 }
 
-void VulkanWidget::wipeScreen()
+void VulkanWidget::clearScreen()
 {
     m_screenBlocked = false;
     m_startingNodeIndex = static_cast<uint32_t>(-1);
@@ -40,6 +40,20 @@ void VulkanWidget::wipeScreen()
     }
 
     sendDebugInfo(QString("Cleared screen. Screen is unblocked."));
+}
+
+void VulkanWidget::resetSolution()
+{
+    m_screenBlocked = false;
+
+    for (size_t i = 0; i < m_nodes.size(); ++i) {
+        if (m_nodes[i].getNodeStatus() == eNodeStatus::MovableNode || m_nodes[i].getNodeStatus() == eNodeStatus::VisitedNode) {
+            m_nodes[i].setNodeStatus(eNodeStatus::MovableNode);
+            m_nodes[i].setColor(m_colors[eNodeStatus::MovableNode]);
+        }
+    }
+
+    sendDebugInfo(QString("Reset solution. Screen is unblocked."));
 }
 
 void VulkanWidget::setSelectedNodeStatus(const eNodeStatus iNodeStatus)
@@ -77,7 +91,8 @@ void VulkanWidget::solve()
                 nanoSeconds += diffMilliSeconds;
                 startTime = endTime;
 
-                if (m_nodes[visitedIndex].getNodeStatus() != eNodeStatus::StartingNode && m_nodes[visitedIndex].getNodeStatus() != eNodeStatus::StartingNode) {
+                if (m_nodes[visitedIndex].getNodeStatus() != eNodeStatus::StartingNode && m_nodes[visitedIndex].getNodeStatus() != eNodeStatus::EndingNode) {
+                    m_nodes[visitedIndex].setNodeStatus(eNodeStatus::VisitedNode);
                     m_nodes[visitedIndex].setColor(m_colors[eNodeStatus::VisitedNode]);
                     draw();
                 }

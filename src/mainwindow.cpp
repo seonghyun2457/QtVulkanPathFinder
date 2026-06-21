@@ -89,16 +89,22 @@ void MainWindow::nodeStatusSelected(const eNodeStatus iNodeStatus)
     m_pVulkanWidget->setSelectedNodeStatus(iNodeStatus);
 }
 
-void MainWindow::on_btnReset_clicked()
-{
-    displayDebugInfo("Reset button clicked");
-    m_pVulkanWidget->wipeScreen();
-}
-
 void MainWindow::on_btnSolve_clicked()
 {
     displayDebugInfo("Solve button clicked");
     m_pVulkanWidget->solve();
+}
+
+void MainWindow::on_btnReset_clicked()
+{
+    displayDebugInfo("Reset button clicked");
+    m_pVulkanWidget->resetSolution();
+}
+
+void MainWindow::on_btnClear_clicked()
+{
+    displayDebugInfo("Clear button clicked");
+    m_pVulkanWidget->clearScreen();
 }
 
 void MainWindow::initializeGuiWidgets()
