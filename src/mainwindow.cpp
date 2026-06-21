@@ -74,14 +74,20 @@ void MainWindow::on_cbRow_activated(const int iIndex)
 {
     bool ok = false;
     const uint32_t rowSize = m_ui->cbRow->itemText(iIndex).toUInt(&ok);
-    if (ok) emit transferRowSize(rowSize);
+    if (ok) {
+        emit transferRowSize(rowSize);
+        on_btnClear_clicked();
+    }
 }
 
 void MainWindow::on_cbCol_activated(const int iIndex)
 {
     bool ok = false;
     const uint32_t columnSize = m_ui->cbCol->itemText(iIndex).toUInt(&ok);
-    if (ok) emit transferColumnSize(columnSize);
+    if (ok) {
+        emit transferColumnSize(columnSize);
+        on_btnClear_clicked();
+    }
 }
 
 void MainWindow::nodeStatusSelected(const eNodeStatus iNodeStatus)
