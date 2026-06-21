@@ -37,9 +37,7 @@ void main()
 	float minDistPx = min(distPxX, distPxY);
 
 
-	if (minDistPx < borderPx) {
-		outColor = pc.borderColor;
-	} else {
-		outColor = pc.color;
-	}
+	// Anti-aliased border edge: smooth transition instead of a hard cutoff
+	float aa = smoothstep(borderPx - 0.5, borderPx + 0.5, minDistPx);
+	outColor = mix(pc.borderColor, pc.color, aa);
 }

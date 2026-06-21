@@ -25,9 +25,9 @@ typedef struct SwapchainImage {
 } SwapchainImage_t;
 
 typedef struct {
-    glm::vec4 color;  // COLOR: RGBA
-    glm::vec4 borderColor;
-    float borderWidth;
+    glm::vec4 color{glm::vec4(0.f, 0.f, 0.f, 0.f)};  // COLOR: RGBA
+    glm::vec4 borderColor{glm::vec4(0.f, 0.f, 0.f, 0.f)};
+    float borderWidth{0.f};
 } pushConstantInfo_t;
 
 class VulkanRenderer

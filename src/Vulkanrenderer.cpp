@@ -1131,9 +1131,9 @@ void VulkanRenderer::recordCommands(const uint32_t iImageIndex, const std::vecto
 
                 // Transfer pushConstantInfo_t to Fragment shader via PushConstant
                 pushConstantInfo_t pushConstInfo{};
-                pushConstInfo.color = glm::vec4(iNodes[i].getColor(), 1.f);
-                pushConstInfo.borderColor = glm::vec4(0.3f, 0.3f, 0.3f, 0.5f);
-                pushConstInfo.borderWidth = 0.05f;
+                pushConstInfo.color = glm::vec4(iNodes[i].getColor(), 1.f);    // Rectangle Color
+                pushConstInfo.borderColor = glm::vec4(0.3f, 0.3f, 0.3f, 0.4f); // Border Color
+                pushConstInfo.borderWidth = 0.05f;                             // Border Width
 
                 m_pDeviceFunctions->vkCmdPushConstants(commandBuffer, m_pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pushConstantInfo_t), &pushConstInfo);
 
