@@ -88,12 +88,16 @@ bool PathFinder::dfs(const uint32_t iStartingIndex, const uint32_t iEndingIndex,
     std::stack<uint32_t> stack;
 
     stack.push(iStartingIndex);
-    discovered.insert(iStartingIndex);
-    oVisitedIndices.push_back(iStartingIndex);
 
     while (!stack.empty()) {
         const uint32_t next = stack.top();
         stack.pop();
+
+        if (discovered.find(next) != discovered.end()) {
+            continue;
+        }
+        discovered.insert(next);
+        oVisitedIndices.push_back(next);
 
         if (next == iEndingIndex) {
             found = true;
@@ -104,9 +108,6 @@ bool PathFinder::dfs(const uint32_t iStartingIndex, const uint32_t iEndingIndex,
         for (const uint32_t neighbor : neighborIndices) {
             if (discovered.find(neighbor) == discovered.end()) {
                 stack.push(neighbor);
-                discovered.insert(neighbor);
-                oVisitedIndices.push_back(neighbor);
-
                 prevs[neighbor] = next;
             }
         }
@@ -239,6 +240,10 @@ bool PathFinder::aStar(const uint32_t iStartingIndex, const uint32_t iEndingInde
         if (candidateIndex == iEndingIndex) {
             found = true;
             break;
+        }
+
+        if (fns[candidateIndex] < candidate.second) {
+            continue;
         }
 
         const std::pair<int32_t, int32_t> from = getIndex2D(iColumnSize, candidateIndex);

@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>998</width>
-    <height>586</height>
+    <width>1005</width>
+    <height>631</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -101,7 +101,7 @@
     <item>
      <widget class="QTabWidget" name="tabInfo">
       <property name="currentIndex">
-       <number>1</number>
+       <number>0</number>
       </property>
       <widget class="QPlainTextEdit" name="vulkanInfo">
        <attribute name="title">
@@ -122,7 +122,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>998</width>
+     <width>1005</width>
      <height>21</height>
     </rect>
    </property>
