@@ -40,8 +40,9 @@ private slots:
     void displayPerformace();
 
     // Row & Column slots
-    void on_cbRow_activated(const int iIndex);
-    void on_cbCol_activated(const int iIndex);
+    void on_cbRow_currentIndexChanged(const int iIndex);
+    void on_cbCol_currentIndexChanged(const int iIndex);
+
 
     // Node Status slot
     void nodeStatusSelected(const eNodeStatus iNodeStatus);

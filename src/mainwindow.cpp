@@ -70,7 +70,7 @@ void MainWindow::displayPerformace()
     setWindowTitle(s_performaceMessage.arg(m_cpuFps, 0, 'f', 3).arg(cpuMsPerFrame, 0, 'f', 3).arg(gpuFpsEquiv, 0, 'f', 3).arg(m_gpuTime, 0, 'f', 3));
 }
 
-void MainWindow::on_cbRow_activated(const int iIndex)
+void MainWindow::on_cbRow_currentIndexChanged(const int iIndex)
 {
     bool ok = false;
     const uint32_t rowSize = m_ui->cbRow->itemText(iIndex).toUInt(&ok);
@@ -80,7 +80,7 @@ void MainWindow::on_cbRow_activated(const int iIndex)
     }
 }
 
-void MainWindow::on_cbCol_activated(const int iIndex)
+void MainWindow::on_cbCol_currentIndexChanged(const int iIndex)
 {
     bool ok = false;
     const uint32_t columnSize = m_ui->cbCol->itemText(iIndex).toUInt(&ok);
@@ -98,6 +98,8 @@ void MainWindow::nodeStatusSelected(const eNodeStatus iNodeStatus)
 void MainWindow::on_btnSolve_clicked()
 {
     displayDebugInfo("Solve button clicked");
+    // Reset solution then solve
+    m_pVulkanWidget->resetSolution();
     m_pVulkanWidget->solve();
 }
 
@@ -134,10 +136,7 @@ void MainWindow::initializeGuiWidgets()
     // Set initial Row/Column
     {
         m_ui->cbRow->setCurrentIndex(m_ui->cbRow->count() - 1);
-        m_ui->cbRow->activated(m_ui->cbRow->count() - 1);
-
         m_ui->cbCol->setCurrentIndex(m_ui->cbCol->count() - 1);
-        m_ui->cbCol->activated(m_ui->cbCol->count() - 1);
     }
 }
 
