@@ -137,15 +137,14 @@ bool PathFinder::dijkstra(const uint32_t iStartingIndex, const uint32_t iEndingI
     } ;
 
     std::priority_queue<std::pair<uint32_t,uint32_t>, std::vector<std::pair<uint32_t,uint32_t>>,compare> open;
-
     open.push(std::pair<uint32_t, uint32_t>(iStartingIndex, 0));
-    oVisitedIndices.push_back(iStartingIndex);
 
     while (!open.empty()) {
         const std::pair<uint32_t, uint32_t> candidate = open.top();
         open.pop();
 
         const uint32_t candidateIndex = candidate.first;
+        oVisitedIndices.push_back(candidateIndex);
 
         if (candidateIndex == iEndingIndex) {
             found = true;
@@ -177,7 +176,6 @@ bool PathFinder::dijkstra(const uint32_t iStartingIndex, const uint32_t iEndingI
             prevs[neighborIndex] = candidateIndex;
 
             open.push(std::pair<uint32_t, uint32_t>{neighborIndex, newDist});
-            oVisitedIndices.push_back(neighborIndex);
         }
     }
 
@@ -228,14 +226,13 @@ bool PathFinder::aStar(const uint32_t iStartingIndex, const uint32_t iEndingInde
 
     // first: index, second: fn(=gn + hn)
     std::priority_queue<std::pair<uint32_t, uint32_t>, std::vector<std::pair<uint32_t,uint32_t>>,compare> open;
-
     open.push(std::pair<uint32_t, uint32_t>(iStartingIndex, fns[iStartingIndex]));
-    oVisitedIndices.push_back(iStartingIndex);
 
     while (!open.empty()) {
         const std::pair<uint32_t, uint32_t> candidate = open.top();
         open.pop();
         const uint32_t candidateIndex = candidate.first;
+        oVisitedIndices.push_back(candidateIndex);
 
         if (candidateIndex == iEndingIndex) {
             found = true;
@@ -259,7 +256,6 @@ bool PathFinder::aStar(const uint32_t iStartingIndex, const uint32_t iEndingInde
             gns[neighborIndex] = newGn;
             fns[neighborIndex] = gns[neighborIndex] + hns[neighborIndex];
             open.push(std::pair<uint32_t, uint32_t>(neighborIndex, fns[neighborIndex]));
-            oVisitedIndices.push_back(neighborIndex);
 
             prevs[neighborIndex] = candidateIndex;
         }
