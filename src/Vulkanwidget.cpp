@@ -86,6 +86,11 @@ void VulkanWidget::solve()
         return;
     }
 
+    if (m_startingNodeIndex == m_endingNodeIndex) {
+        QMessageBox::critical(nullptr, "", "Starting point and Destination point must be different!");
+        return;
+    }
+
     std::list<uint32_t> pathIndices;
     std::list<uint32_t> visitedIndices;
     solutionFound = PathFinder::solve(m_solver, m_startingNodeIndex, m_endingNodeIndex, m_rowSize, m_columnSize, m_nodes, pathIndices, visitedIndices);
