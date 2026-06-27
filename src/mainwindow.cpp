@@ -5,7 +5,6 @@
 #include <QPlainTextEdit>
 #include <QVulkanWindow>
 
-#include "eSolver.h"
 #include "ui_mainwindow.h"
 
 const QString MainWindow::s_performaceMessage = "Qt + Vulkan Pathfinder - [CPU FPS: %1 (%2ms/frame), GPU FPS equiv: %3 (%4ms/frame)]";
@@ -13,7 +12,7 @@ const QString MainWindow::s_performaceMessage = "Qt + Vulkan Pathfinder - [CPU F
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
     , m_ui(std::make_unique<Ui::MainWindow>())
-    , m_pVulkanWidget(std::make_unique<VulkanWidget>())
+    , m_pVulkanWidget(new VulkanWidget())
 {
     m_ui->setupUi(this);
 
@@ -27,6 +26,7 @@ MainWindow::MainWindow(QWidget* parent)
 MainWindow::~MainWindow()
 {
     qDebug() << "destroying m_pVulkanWidget";
+    // m_pVulkanWidget will be free in widget tree.
     m_pVulkanWidget = nullptr;
     qDebug() << "destroyed m_pVulkanWidget";
 }
@@ -118,8 +118,8 @@ void MainWindow::on_btnClear_clicked()
 void MainWindow::initializeGuiWidgets()
 {
     // CONNECT
-    connect(this, &MainWindow::transferRowSize, m_pVulkanWidget.get(), &VulkanWidget::setRowSize);
-    connect(this, &MainWindow::transferColumnSize, m_pVulkanWidget.get(), &VulkanWidget::setColumnSize);
+    connect(this, &MainWindow::transferRowSize, m_pVulkanWidget, &VulkanWidget::setRowSize);
+    connect(this, &MainWindow::transferColumnSize, m_pVulkanWidget, &VulkanWidget::setColumnSize);
 
     m_pVulkanWidget->setMaxProblemSize(MAX_ROW_SIZE, MAX_COLUMN_SIZE);
 
@@ -142,44 +142,30 @@ void MainWindow::initializeGuiWidgets()
 
 void MainWindow::initializeVulkanWidget()
 {
-    if (!m_pVulkanWidget) {
-        displayDebugInfo("Failed to instantiate Vulkan window.");
-        return;
+    if (m_pVulkanWidget == nullptr) {
+        qCritical() << "Failed to instantiate Vulkan widget.";
+        exit(1);
     }
 
     // CONNECT
     // - Logging
-    connect(m_pVulkanWidget.get(), &VulkanWidget::sendVulkanInfo, this, &MainWindow::displayVulkanInfo);
-    connect(m_pVulkanWidget.get(), &VulkanWidget::sendDebugInfo, this, &MainWindow::displayDebugInfo);
-    connect(m_pVulkanWidget.get(), &VulkanWidget::gpuTimeUpdated, this, &MainWindow::updateGpuTime);
-    connect(m_pVulkanWidget.get(), &VulkanWidget::cpuFpsUpdated, this, &MainWindow::updateCpuFps);
+    connect(m_pVulkanWidget, &VulkanWidget::sendVulkanInfo, this, &MainWindow::displayVulkanInfo);
+    connect(m_pVulkanWidget, &VulkanWidget::sendDebugInfo, this, &MainWindow::displayDebugInfo);
+    connect(m_pVulkanWidget, &VulkanWidget::gpuTimeUpdated, this, &MainWindow::updateGpuTime);
+    connect(m_pVulkanWidget, &VulkanWidget::cpuFpsUpdated, this, &MainWindow::updateCpuFps);
 
     // - Mouse events
-    connect(m_pVulkanWidget.get(), &VulkanWidget::mousePressed, this, &MainWindow::onMousePressed);
-    connect(m_pVulkanWidget.get(), &VulkanWidget::mouseMoved, this, &MainWindow::onMouseMoved);
+    connect(m_pVulkanWidget, &VulkanWidget::mousePressed, this, &MainWindow::onMousePressed);
+    connect(m_pVulkanWidget, &VulkanWidget::mouseMoved, this, &MainWindow::onMouseMoved);
 
-    qDebug() << "m_pVulkanWidget->width(): " << m_pVulkanWidget->width();
-    qDebug() << "m_pVulkanWidget->height(): " << m_pVulkanWidget->height();
-
-    m_pVulkanWidget->setWidth(900);
-    m_pVulkanWidget->setHeight(500);
-
-    qDebug() << "m_pVulkanWidget->width(): " << m_pVulkanWidget->width();
-    qDebug() << "m_pVulkanWidget->height(): " << m_pVulkanWidget->height();
 
     // Window Container
-    QWidget* pWindowContainer = QWidget::createWindowContainer(m_pVulkanWidget.get(), m_ui->vulkanWindow->parentWidget());
-    // pWindowContainer->setMouseTracking(true);
+    QWidget* pWindowContainer = QWidget::createWindowContainer(m_pVulkanWidget, m_ui->vulkanWindow->parentWidget());
     pWindowContainer->setSizePolicy(m_ui->vulkanWindow->sizePolicy());
     pWindowContainer->setMinimumSize(m_ui->vulkanWindow->minimumSize());
+    pWindowContainer->resize(VULKAN_WIDGET_WIDTH, VULKAN_WIDGET_HEIGHT);
 
-    qDebug() << "pWindowContainer->sizePolicy(): " << pWindowContainer->sizePolicy();
-    qDebug() << "pWindowContainer->minimumSize(): " << pWindowContainer->minimumSize();
-    qDebug() << "pWindowContainer->width(): " << pWindowContainer->width();
-    qDebug() << "pWindowContainer->height(): " << pWindowContainer->height();
-    pWindowContainer->resize(900, 500);
-    qDebug() << "pWindowContainer->width(): " << pWindowContainer->width();
-    qDebug() << "pWindowContainer->height(): " << pWindowContainer->height();
+    displayDebugInfo(QString("Initial vulkan window size: [width: %1, height: %2]").arg(pWindowContainer->width()).arg(pWindowContainer->height()));
 
     // Replace Window widget
     m_ui->vulkanLayout->replaceWidget(m_ui->vulkanWindow, pWindowContainer);
@@ -191,14 +177,14 @@ void MainWindow::initializeGroupColor()
 {
     // CONNECT
     connect(m_ui->gbNodeColor, &GroupNodeColor::nodeStatusSelected, this, &MainWindow::nodeStatusSelected);
-    connect(m_ui->gbNodeColor, &GroupNodeColor::colorSelcted, m_pVulkanWidget.get(), &VulkanWidget::setColorSetting);
+    connect(m_ui->gbNodeColor, &GroupNodeColor::colorSelcted, m_pVulkanWidget, &VulkanWidget::setColorSetting);
 
     m_ui->gbNodeColor->initialize();
 }
 
 void MainWindow::initializeSolver()
 {
-    connect(m_ui->gbSolver, &GroupSolver::solverChanged, m_pVulkanWidget.get(), &VulkanWidget::setSolver);
+    connect(m_ui->gbSolver, &GroupSolver::solverChanged, m_pVulkanWidget, &VulkanWidget::setSolver);
 
     m_ui->gbSolver->initialize();
 }

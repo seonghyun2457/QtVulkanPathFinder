@@ -60,8 +60,14 @@ private:
 
 private:
     std::unique_ptr<Ui::MainWindow> m_ui;
-    std::unique_ptr<VulkanWidget> m_pVulkanWidget{nullptr};
 
+    // Vulkan Widget
+    VulkanWidget* m_pVulkanWidget{nullptr};
+    static constexpr uint32_t VULKAN_WIDGET_WIDTH{900};
+    static constexpr uint32_t VULKAN_WIDGET_HEIGHT{500};
+
+
+    // Problem size definitions
     static constexpr uint32_t INITIAL_SIZE{2};
     static constexpr uint32_t MAX_ROW_SIZE{30};
     static constexpr uint32_t MAX_COLUMN_SIZE{40};
