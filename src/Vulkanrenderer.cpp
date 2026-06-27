@@ -103,6 +103,9 @@ void VulkanRenderer::cleanup()
     // Destroy Rectangle buffers
     destroyRectangleBuffers();
 
+    // Destroy Instance buffers
+    destroyInstanceBuffers();
+
     // Destroy descriptor pool
     if (m_descriptorPool != VK_NULL_HANDLE) {
         m_pDeviceFunctions->vkDestroyDescriptorPool(m_logicalDevice, m_descriptorPool, nullptr);
@@ -287,6 +290,7 @@ void VulkanRenderer::draw(const std::vector<Node>& iNodes, const size_t iDrawabl
     // Update Uniform buffers
     recordCommands(imageIndex, iNodes, iDrawableNodeCount);
     updateUniformBuffers(imageIndex);
+    updateInstanceBuffers(iNodes, iDrawableNodeCount, imageIndex);
 
     // SUBMIT COMMAND BUFFER TO RENDERER
     {
@@ -359,6 +363,11 @@ void VulkanRenderer::createNodes(const uint32_t iMaxRowSize, const uint32_t iMax
             oNodes.emplace_back(Node(this, recPos, normalizedRectangleHalfWidth, normalizedRectangleHalfHeight, iColor));
         }
     }
+
+    const size_t maxSize = iMaxRowSize * iMaxColumnSize;
+
+    // Create Instance buffers
+    createInstanceBuffers(maxSize);
 }
 
 void VulkanRenderer::waitDeviceIdle()
@@ -1095,32 +1104,30 @@ void VulkanRenderer::recordCommands(const uint32_t iImageIndex, const std::vecto
 
             m_pDeviceFunctions->vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-            for (size_t i = 0; i < iDrawableNodeCount; ++i) {
-                // Bind mesh vertex buffer with 0 offset
-                std::array<VkBuffer, 1> vertexBuffer = { m_rectangleBuffers.m_vertexBuffer }; // Buffers to bind
-                std::array<VkDeviceSize, 1> offsets = { 0 };                                  // Offsets into buffers being bound
-                m_pDeviceFunctions->vkCmdBindVertexBuffers(commandBuffer, 0, vertexBuffer.size(), vertexBuffer.data(), offsets.data()); // Command to bind vertex buffer before drawing with that
+            // record commands for drawable objects
+            {
+                // Bind the shared unit-quad (binidng 0) and the per-instnace data (binding 1)
+                std::array<VkBuffer, 2> vertexBuffers{m_rectangleBuffers.m_vertexBuffer, m_instanceBuffers[iImageIndex]};
+                std::array<VkDeviceSize, 2> offsets{0, 0};
+                m_pDeviceFunctions->vkCmdBindVertexBuffers(commandBuffer, 0, vertexBuffers.size(), vertexBuffers.data(), offsets.data());
 
                 // Bind mesh index buffer with 0 offset and using the uint32 type
                 m_pDeviceFunctions->vkCmdBindIndexBuffer(commandBuffer, m_rectangleBuffers.m_indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
                 // Bind Descriptor sets (for Uniform Buffer ModelViewProjection)
                 m_pDeviceFunctions->vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout,
-                                                        0, 1,
-                                                        &m_descriptorSets[iImageIndex],
-                                                        0, nullptr);
+                                                            0, 1,
+                                                            &m_descriptorSets[iImageIndex],
+                                                            0, nullptr);
 
-                // Transfer pushConstantInfo_t to Fragment shader via PushConstant
+                // Border color/width are shared by every node -> push once to the fragment shader
                 pushConstantInfo_t pushConstInfo{};
-                pushConstInfo.color = glm::vec4(iNodes[i].getColor(), 1.f);                                                    // Rectangle Color
-                pushConstInfo.borderColor = glm::vec4(0.3f, 0.3f, 0.3f, 0.4f);                                                 // Border Color
-                pushConstInfo.rect = glm::vec4(iNodes[i].getCenterPos(), iNodes[i].getHalfWidth(), iNodes[i].getHalfHeight()); // rectangle info
-                pushConstInfo.borderWidth = 0.05f;                                                                             // Border Width
+                pushConstInfo.borderColor = glm::vec4(0.3f, 0.3f, 0.3f, 0.4f);   // Border Color
+                pushConstInfo.borderWidth = 0.05f;                               // Border Width
+                m_pDeviceFunctions->vkCmdPushConstants(commandBuffer, m_pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pushConstantInfo_t), &pushConstInfo);
 
-                m_pDeviceFunctions->vkCmdPushConstants(commandBuffer, m_pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pushConstantInfo_t), &pushConstInfo);
-
-                // Draw by index
-                m_pDeviceFunctions->vkCmdDrawIndexed(commandBuffer, m_rectangleBuffers.m_indices.size(), 1, 0, 0, 0);
+                // One instanced draw: 6 indices (a quad) * iDrawableNodeCount instances
+                m_pDeviceFunctions->vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(m_rectangleBuffers.m_indices.size()), static_cast<uint32_t>(iDrawableNodeCount), 0, 0, 0);
             }
         }
 
@@ -1279,7 +1286,7 @@ void VulkanRenderer::createDescriptorSetLayout()
 
 void VulkanRenderer::createPushConstantRange()
 {
-    m_pushConstantRange.stageFlags =  VK_SHADER_STAGE_VERTEX_BIT  | VK_SHADER_STAGE_FRAGMENT_BIT; // Send PushConstant to vertex shader and fragment shader
+    m_pushConstantRange.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT; // Send PushConstant to fragment shader
     m_pushConstantRange.offset = 0;
     m_pushConstantRange.size = sizeof(pushConstantInfo_t);
 }
@@ -1324,33 +1331,59 @@ void VulkanRenderer::createGraphicsPipeline()
     // CREATE GRAPHICS PIPELINE
     {
         // How the data for a single vertex (including info such as position, color, texture coords, normals, etc) is as a whole
-        VkVertexInputBindingDescription vertexbindingDescption{};
-        vertexbindingDescption.binding = 0;
-        vertexbindingDescption.stride = sizeof(Vertex);
-        vertexbindingDescption.inputRate = VK_VERTEX_INPUT_RATE_VERTEX; // How to move between data after each vertex
+        std::array<VkVertexInputBindingDescription, 2> vertexbindingDescptions{};
+
+        {
+            // Binding 0: shared unit-quad (per-vertex)
+            vertexbindingDescptions[0].binding = 0;
+            vertexbindingDescptions[0].stride = sizeof(Vertex);
+            vertexbindingDescptions[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX; // How to move between data after each vertex
+
+            // Binding 1: per-node data (per-instance)
+            vertexbindingDescptions[1].binding = 1;
+            vertexbindingDescptions[1].stride = sizeof(instanceData_t);
+            vertexbindingDescptions[1].inputRate = VK_VERTEX_INPUT_RATE_INSTANCE; // How to move between data after each instance
+        }
 
         // How the data for an attribute is defined within a vertex
-        std::array<VkVertexInputAttributeDescription, 2> vertexInputAttributesDescripotions;
+        std::array<VkVertexInputAttributeDescription, 4> vertexInputAttributesDescripotions{};
 
-        // Position attribute
-        // layout(location = 0) in vec3 pos in Vertex Shader
-        vertexInputAttributesDescripotions[0].binding = 0;                         // Which binding the data is at (should be same as above)
-        vertexInputAttributesDescripotions[0].location = 0;                        // Location in shader where data will be read from
-        vertexInputAttributesDescripotions[0].format = VK_FORMAT_R32G32B32_SFLOAT; // Formate the data will take (also helps to define the size of data). 12 bytes.
-        vertexInputAttributesDescripotions[0].offset = offsetof(Vertex, pos);      // Where this attribute is defined in the data for a single vertex
+        {
+            // Position attribute
+            // layout(location = 0) in vec3 pos in Vertex Shader
+            vertexInputAttributesDescripotions[0].binding = 0;                         // Which binding the data is at (should be same as above)
+            vertexInputAttributesDescripotions[0].location = 0;                        // Location in shader where data will be read from
+            vertexInputAttributesDescripotions[0].format = VK_FORMAT_R32G32B32_SFLOAT; // Formate the data will take (also helps to define the size of data). 12 bytes.
+            vertexInputAttributesDescripotions[0].offset = offsetof(Vertex, pos);      // Where this attribute is defined in the data for a single vertex
 
-        // UV attribute
-        // layout(location = 1) in vec2 uv in Vertex Shader
-        vertexInputAttributesDescripotions[1].binding = 0;
-        vertexInputAttributesDescripotions[1].location = 1;
-        vertexInputAttributesDescripotions[1].format = VK_FORMAT_R32G32_SFLOAT; // 8 bytes for UV
-        vertexInputAttributesDescripotions[1].offset = offsetof(Vertex, uv);
+            // UV attribute
+            // layout(location = 1) in vec2 uv in Vertex Shader
+            vertexInputAttributesDescripotions[1].binding = 0;
+            vertexInputAttributesDescripotions[1].location = 1;
+            vertexInputAttributesDescripotions[1].format = VK_FORMAT_R32G32_SFLOAT; // 8 Bytes for UV
+            vertexInputAttributesDescripotions[1].offset = offsetof(Vertex, uv);
+
+            // UV attribute
+            // layout(location = 2) in vec4 in inRect
+            vertexInputAttributesDescripotions[2].binding = 1;
+            vertexInputAttributesDescripotions[2].location = 2;
+            vertexInputAttributesDescripotions[2].format = VK_FORMAT_R32G32B32A32_SFLOAT; // 16 Bytes for Rectangle Center position
+            vertexInputAttributesDescripotions[2].offset = offsetof(instanceData_t, rect);
+
+            // UV attribute
+            // layout(location = 3) in vec4 in inColor
+            vertexInputAttributesDescripotions[3].binding = 1;
+            vertexInputAttributesDescripotions[3].location = 3;
+            vertexInputAttributesDescripotions[3].format = VK_FORMAT_R32G32B32A32_SFLOAT; // 16 Bytes for Rectangle Color
+            vertexInputAttributesDescripotions[3].offset = offsetof(instanceData_t, color);
+        }
+
 
         // VERTEX INPUT STATE
         VkPipelineVertexInputStateCreateInfo vertexInputStateCreateInfo{};
         vertexInputStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-        vertexInputStateCreateInfo.vertexBindingDescriptionCount = 1;
-        vertexInputStateCreateInfo.pVertexBindingDescriptions = &vertexbindingDescption;
+        vertexInputStateCreateInfo.vertexBindingDescriptionCount = static_cast<uint32_t>(vertexbindingDescptions.size());
+        vertexInputStateCreateInfo.pVertexBindingDescriptions = vertexbindingDescptions.data();
         vertexInputStateCreateInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(vertexInputAttributesDescripotions.size());
         vertexInputStateCreateInfo.pVertexAttributeDescriptions = vertexInputAttributesDescripotions.data();
 
@@ -1590,6 +1623,68 @@ void VulkanRenderer::destroyRectangleBuffers()
     // clean up index buffer parts
     destroyBuffer(m_rectangleBuffers.m_indexBuffer);
     destroyBufferMemory(m_rectangleBuffers.m_indexBufferMemory);
+}
+
+void VulkanRenderer::createInstanceBuffers(const size_t iMaxNodeCount)
+{
+    printDebugInfo("Create instnace buffers");
+
+    // Instance buffer size
+    const VkDeviceSize instanceSize = sizeof(instanceData_t) * iMaxNodeCount;
+
+    // Create Instance buffer for each swapchain
+    m_instanceBuffers.resize(m_swapchainImages.size(), VK_NULL_HANDLE);
+    m_instanceBufferMemories.resize(m_swapchainImages.size(), VK_NULL_HANDLE);
+
+    // Create instance buffers
+    for (size_t i = 0; i < m_swapchainImages.size(); ++i) {
+        createBuffer(m_physicalDevice,
+                     m_logicalDevice,
+                     instanceSize,
+                     VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                     m_instanceBuffers[i],
+                     m_instanceBufferMemories[i]);
+    }
+
+    // Create tmpInstanceData for copy
+    m_tmpInstanceData.resize(iMaxNodeCount);
+}
+
+void VulkanRenderer::destroyInstanceBuffers()
+{
+    printDebugInfo("Destory instnace buffers");
+
+    // Clean up Instance buffers
+    for (size_t i = 0; i < m_instanceBuffers.size(); ++i) {
+        destroyBuffer(m_instanceBuffers[i]);
+    }
+
+    // Clean up Instance buffer memories
+    for (size_t i = 0; i < m_instanceBufferMemories.size(); ++i) {
+        destroyBufferMemory(m_instanceBufferMemories[i]);
+    }
+}
+
+void VulkanRenderer::updateInstanceBuffers(const std::vector<Node> &iNodes, const size_t iDrawableNodeCount, const uint32_t iImageIndex)
+{
+    Q_ASSERT(m_pDeviceFunctions != nullptr);
+
+    if (iDrawableNodeCount == 0) {
+        return;
+    }
+
+    for (size_t i = 0; i < iDrawableNodeCount; ++i) {
+        m_tmpInstanceData[i].rect = glm::vec4(iNodes[i].getCenterPos(), iNodes[i].getHalfWidth(), iNodes[i].getHalfHeight());
+        m_tmpInstanceData[i].color = glm::vec4(iNodes[i].getColor(), 1.f);
+    }
+
+    const VkDeviceSize instanceSize = sizeof(instanceData_t) * iDrawableNodeCount;
+
+    void* pData = nullptr;
+    m_pDeviceFunctions->vkMapMemory(m_logicalDevice, m_instanceBufferMemories[iImageIndex], 0, instanceSize, 0, &pData);
+    memcpy(pData, m_tmpInstanceData.data(), static_cast<size_t>(instanceSize));
+    m_pDeviceFunctions->vkUnmapMemory(m_logicalDevice, m_instanceBufferMemories[iImageIndex]);
 }
 
 void VulkanRenderer::printVulkanInfo(const QString &iString) const

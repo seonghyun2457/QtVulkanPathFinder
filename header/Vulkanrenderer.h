@@ -25,9 +25,12 @@ typedef struct SwapchainImage {
 } SwapchainImage_t;
 
 typedef struct {
-    glm::vec4 color{glm::vec4(0.f, 0.f, 0.f, 0.f)};        // COLOR: RGBA
+    glm::vec4 rect{glm::vec4(0.f, 0.f, 0.f, 0.f)};   // xy = center (NDC), zw = half-size (NDC)
+    glm::vec4 color{glm::vec4(0.f, 0.f, 0.f, 0.f)};  // RGBA
+} instanceData_t;
+
+typedef struct {  // COLOR: RGBA
     glm::vec4 borderColor{glm::vec4(0.f, 0.f, 0.f, 0.f)};
-    glm::vec4 rect{glm::vec4(0.f, 0.f, 0.f, 0.f)};         // xy = centerPosition, zw = half width/height
     float borderWidth{0.f};
 } pushConstantInfo_t;
 
@@ -88,6 +91,11 @@ private:
     // Rectangle buffer
     void createRectangleBuffers();
     void destroyRectangleBuffers();
+
+    // Instnace Buffers
+    void createInstanceBuffers(const size_t iMaxNodeCount);
+    void destroyInstanceBuffers();
+    void updateInstanceBuffers(const std::vector<Node>& iNodes, const size_t iDrawableNodeCount, const uint32_t iImageIndex);
 
     // Print information
     void printVulkanInfo(const QString& iString) const;
@@ -236,6 +244,11 @@ private:
     std::vector<VkFence> m_fences;
     size_t m_currentFrame{0};
     size_t m_prevFrame{0};
+
+    // InstanceRate
+    std::vector<VkBuffer> m_instanceBuffers;
+    std::vector<VkDeviceMemory> m_instanceBufferMemories;
+    std::vector<instanceData_t> m_tmpInstanceData; // Pack per-node data (pos/size + color) for nodes
 
     // SUPPORT
     // - Pointer to functions

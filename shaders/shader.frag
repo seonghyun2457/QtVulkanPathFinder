@@ -1,15 +1,13 @@
 #version 450
-
-layout(location = 0) in vec2 fragUv;
+layout(location = 0) in vec4 fragColor;
+layout(location = 1) in vec2 fragUv;
 
 layout(location = 0) out vec4 outColor; // Final output color (must also have location)
 
 layout(std140, push_constant) uniform PushConstants {
-	vec4 color;
 	vec4 borderColor;
-	vec4 rect;          // xy = center, wz = half width/height size
 	float borderWidth;
-} pc;
+} pushConstants;
 
 void main() 
 {
@@ -23,7 +21,7 @@ void main()
 	float refPx = min(rectSizePx.x, rectSizePx.y);
 
 	// thikness of border at pixel level
-	float borderPx = pc.borderWidth * refPx;
+	float borderPx = pushConstants.borderWidth * refPx;
 
 
 	// UV distance to the closest outout
@@ -39,5 +37,5 @@ void main()
 
 	// Anti-aliased border edge: smooth transition instead of a hard cutoff
 	float aa = smoothstep(borderPx - 0.5, borderPx + 0.5, minDistPx);
-	outColor = mix(pc.borderColor, pc.color, aa);
+	outColor = mix(pushConstants.borderColor, fragColor, aa);
 }

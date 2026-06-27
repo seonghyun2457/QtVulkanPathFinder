@@ -1,7 +1,12 @@
 #version 450 // Use GLSL 4.5
 
-layout(location = 0) in vec3 pos; // Local unit-quad position in [-1, 1]
-layout(location = 1) in vec2 uv;
+// Per-vertex data (binding 0)
+layout(location = 0) in vec3 pos; // per-vertex: unit quad position in [-1, 1]
+layout(location = 1) in vec2 uv;  // per-vertex: uv coordinates [0, 1]
+
+// Per-instance data (binding 1)
+layout(location = 2) in vec4 inRect;  // xy = center pos (NDC), zw = half-size (NDC)
+layout(location = 3) in vec4 inColor; // RGBA
 
 layout (std140, set = 0, binding = 0) uniform UboModelViewProjection {
 	mat4 model;
@@ -9,19 +14,15 @@ layout (std140, set = 0, binding = 0) uniform UboModelViewProjection {
 	mat4 projection;
 } uboModelViewProjection;
 
-layout(std140, push_constant) uniform PushConstants {
-	vec4 color;
-	vec4 borderColor;
-	vec4 rect;          // xy = center (NDC), wz = half width/height size (NDC)
-	float borderWidth;
-} pc;
 
-layout(location = 0) out vec2 fragUv;
+layout(location = 0) out vec4 fragColor;
+layout(location = 1) out vec2 fragUv;
 
 void main() 
 {
-	vec2 worldPos = pos.xy * pc.rect.zw + pc.rect.xy;
+	// Place ther shared unit quad at this instance's rectangle
+	vec2 worldPos = pos.xy * inRect.zw + inRect.xy;
 	gl_Position = uboModelViewProjection.projection * uboModelViewProjection.view * uboModelViewProjection.model * vec4(worldPos, 0.0, 1.0);
-
+	fragColor = inColor;
 	fragUv = uv;
 }
