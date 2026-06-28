@@ -17,6 +17,7 @@ MainWindow::MainWindow(QWidget* parent)
     m_ui->setupUi(this);
 
     // Initialize
+    initializeTabInfos();
     initializeVulkanWidget();
     initializeGuiWidgets();
     initializeGroupColor();
@@ -113,6 +114,12 @@ void MainWindow::on_btnClear_clicked()
 {
     displayDebugInfo("Clear button clicked");
     m_pVulkanWidget->clearWindow();
+}
+
+void MainWindow::initializeTabInfos()
+{
+    m_ui->debugLog->setMaximumBlockCount(TAB_INFO_MAX_LOG_LINES);
+    m_ui->vulkanInfo->setMaximumBlockCount(TAB_INFO_MAX_LOG_LINES);
 }
 
 void MainWindow::initializeGuiWidgets()

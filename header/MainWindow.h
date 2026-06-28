@@ -53,13 +53,18 @@ private slots:
     void on_btnClear_clicked();
 
 private:
+    void initializeTabInfos();
     void initializeGuiWidgets();
     void initializeVulkanWidget();
     void initializeGroupColor();
     void initializeSolver();
 
 private:
+    // GUI
     std::unique_ptr<Ui::MainWindow> m_ui;
+
+    // Tabinfo
+    static constexpr uint32_t TAB_INFO_MAX_LOG_LINES{200};
 
     // Vulkan Widget
     VulkanWidget* m_pVulkanWidget{nullptr};
