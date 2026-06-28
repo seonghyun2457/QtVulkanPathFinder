@@ -14,7 +14,7 @@
    <string>MainWindow</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QVBoxLayout" name="verticalLayout_2" stretch="5,5">
+   <layout class="QVBoxLayout" name="verticalLayout_2" stretch="4,2">
     <item>
      <layout class="QHBoxLayout" name="vulkanLayout" stretch="9,1">
       <property name="spacing">
@@ -130,8 +130,14 @@
     </item>
     <item>
      <widget class="QTabWidget" name="tabInfo">
+      <property name="minimumSize">
+       <size>
+        <width>0</width>
+        <height>200</height>
+       </size>
+      </property>
       <property name="currentIndex">
-       <number>0</number>
+       <number>1</number>
       </property>
       <widget class="QPlainTextEdit" name="vulkanInfo">
        <attribute name="title">
