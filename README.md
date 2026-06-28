@@ -27,6 +27,26 @@ starting node colors — so the path reads as a gradient from one endpoint to th
 other. Pressing **Reset** demotes those `SolutionNode` (and `VisitedNode`) cells
 back to `MovableNode` while leaving your walls intact.
 
+## Shaders
+
+The renderer uses a single pair of GLSL 4.5 shaders under `shaders/`, compiled to
+SPIR-V (`vert.spv`, `frag.spv`) and consumed by the Vulkan pipeline. Every grid
+cell is drawn with **instanced rendering**: one shared unit quad is reused for all
+cells, and per-cell data is supplied as instance attributes.
+
+- **`shader.vert`** — places the shared unit quad at each instance's rectangle.
+  Per-vertex inputs are the quad position and UV; per-instance inputs are the
+  cell's center/half-size (`inRect`) and `inColor`. It transforms the cell by a
+  model/view/projection matrix passed in a `std140` uniform buffer (set 0,
+  binding 0) and forwards color and UV to the fragment stage.
+- **`shader.frag`** — fills each cell with its color and draws an anti-aliased
+  border. Border color and width come from a push constant. It derives the cell's
+  pixel size from `fwidth(uv)`, measures the UV distance to the nearest edge, and
+  uses `smoothstep` + `mix` to blend smoothly between the border and fill colors.
+
+`CMakeLists.txt` glob-includes `shaders/shader.*`; the `.spv` binaries are the
+compiled outputs loaded at runtime.
+
 ## Usage
 
 ### 1. Set the problem size
