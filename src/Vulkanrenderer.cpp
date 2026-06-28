@@ -15,8 +15,8 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 
-VulkanRenderer::VulkanRenderer(VulkanWidget* window)
-    : m_window(window)
+VulkanRenderer::VulkanRenderer(VulkanWidget* iPVulkanWidget)
+    : m_pVulkanWidget(iPVulkanWidget)
 {
 
 }
@@ -24,6 +24,9 @@ VulkanRenderer::VulkanRenderer(VulkanWidget* window)
 VulkanRenderer::~VulkanRenderer()
 {
     qDebug() << "destroy VulkanRenderer";
+    cleanup();
+    qDebug() << "cleaned up";
+    qDebug() << "VulkanRenderer destroyed";
 }
 
 bool VulkanRenderer::initialize()
@@ -41,7 +44,7 @@ bool VulkanRenderer::initialize()
         {
             selectPhysicalDevice();
             createLogicalDevice();
-            createSwapChain();
+            createSwapchain();
             createDescriptorSetLayout();
             createPushConstantRange();
             createGraphicsPipeline();
@@ -60,20 +63,11 @@ bool VulkanRenderer::initialize()
 
         // Set UBOModelViewProjection buffer
         {
-
             m_uboModelViewProjection.model = glm::mat4(1.f);
 
             m_uboModelViewProjection.view = glm::lookAt(glm::vec3(0.f, 0.f, 10.f),
                                                         glm::vec3(0.f, 0.f, 0.f),
                                                         glm::vec3(0.f, 1.f, 0.f));
-
-            /*
-            const float aspect = m_extent.width / (float)m_extent.height;
-            m_uboModelViewProjection.projection = glm::perspective(glm::radians(45.f),
-                                                                   aspect,
-                                                                   0.1f,
-                                                                   100.f);
-            */
 
             // use Orthographic projection
              m_uboModelViewProjection.projection = glm::ortho(-1.f, 1.f, -1.f, 1.f, 0.1f, 100.f);
@@ -96,9 +90,11 @@ bool VulkanRenderer::initialize()
 
 void VulkanRenderer::cleanup()
 {
-    Q_ASSERT(m_pDeviceFunctions != VK_NULL_HANDLE);
+    if (m_pDeviceFunctions == nullptr) return;
 
-    waitDeviceIdle();
+    // Wait until Idle status
+    m_pDeviceFunctions->vkDeviceWaitIdle(m_logicalDevice);
+
 
     // Destroy Rectangle buffers
     destroyRectangleBuffers();
@@ -107,23 +103,10 @@ void VulkanRenderer::cleanup()
     destroyInstanceBuffers();
 
     // Destroy descriptor pool
-    if (m_descriptorPool != VK_NULL_HANDLE) {
-        m_pDeviceFunctions->vkDestroyDescriptorPool(m_logicalDevice, m_descriptorPool, nullptr);
-        m_descriptorPool = VK_NULL_HANDLE;
-    }
+    destroyDestriptorPool();
 
     // Destroy uniform buffers
-    {
-        // Destroy buffer
-        for (size_t i = 0; i < m_uboModelViewProjectionBuffers.size(); ++i) {
-            destroyBuffer(m_uboModelViewProjectionBuffers[i]);
-        }
-
-        // Free buffer memory
-        for (size_t i = 0; i < m_uboModelViewProjectionBuffersMemory.size(); ++i) {
-            destroyBufferMemory(m_uboModelViewProjectionBuffersMemory[i]);
-        }
-    }
+    destroyUniformBuffers();
 
     // Destroy command pools
     {
@@ -201,23 +184,7 @@ void VulkanRenderer::cleanup()
     }
 
     // Destroy SwapChain
-    {
-        // Destroy Image view
-        destroySwapChainResources();
-
-        auto* vkDestroySwapchainKHR = (PFN_vkDestroySwapchainKHR)(m_vulkanInstance.getInstanceProcAddr("vkDestroySwapchainKHR"));
-        Q_ASSERT(vkDestroySwapchainKHR != nullptr);
-
-        if (m_swapchain != VK_NULL_HANDLE) {
-            vkDestroySwapchainKHR(m_logicalDevice, m_swapchain, nullptr);
-            m_swapchain = VK_NULL_HANDLE;
-        }
-
-        if (m_oldSwapchain != VK_NULL_HANDLE) {
-            vkDestroySwapchainKHR(m_logicalDevice, m_oldSwapchain, nullptr);
-            m_oldSwapchain = VK_NULL_HANDLE;
-        }
-    }
+    destroySwapchain();
 
     // Destroy logical device
     {
@@ -231,48 +198,21 @@ void VulkanRenderer::cleanup()
     qDebug() << "cleaned up";
 }
 
-void VulkanRenderer::recreateSwapChain()
+void VulkanRenderer::recreateSwapchain(const uint32_t iMaxRowSize, const uint32_t iMaxColumnSize)
 {
-    printDebugInfo("Recreate SwapChain");
+    const size_t prevSwapchainImageCount = m_pSwapchain->getSwapchainImageCount();
 
-    if (m_window->width() == 0 || m_window->height() == 0) {
-        printDebugInfo("Window minimized, skip recreateSwapChain");
-        return;
-    }
+    m_pSwapchain->recreateSwapchain(m_surface, m_surfaceFormat);
 
-    // Wait until Idle status
-    m_pDeviceFunctions->vkDeviceWaitIdle(m_logicalDevice);
-
-    // Move current swapchain to old swapchain to recreate
-    m_oldSwapchain = m_swapchain;
-    m_swapchain    = VK_NULL_HANDLE;
-
-    // Destroy swapchain resources
-    destroySwapChainResources();
-
-    // Recreate a swapchain
-    createSwapChain();
-
-    // Destroy old swapchain
-    if (m_oldSwapchain != VK_NULL_HANDLE) {
-        auto* vkDestroySwapchainKHR = (PFN_vkDestroySwapchainKHR)m_vulkanInstance.getInstanceProcAddr("vkDestroySwapchainKHR");
-        Q_ASSERT(vkDestroySwapchainKHR != nullptr);
-        vkDestroySwapchainKHR(m_logicalDevice, m_oldSwapchain, nullptr);
-        m_oldSwapchain = VK_NULL_HANDLE;
+    // If swapchain image count changes, we should recreate resources depending on swapchain
+    if (prevSwapchainImageCount != m_pSwapchain->getSwapchainImageCount()) {
+        recreateImageDependentResources(iMaxRowSize * iMaxColumnSize);
     }
 }
 
 void VulkanRenderer::draw(const std::vector<Node>& iNodes, const size_t iDrawableNodeCount)
 {
-
-    /*
-    for (size_t i = 0; i < m_objects.size(); ++i) {
-        glm::mat4 modelMat = glm::rotate(glm::mat4(1.f), glm::radians(60.f), glm::vec3(0.0f, 0.0f, 1.0f));
-        m_uboModelViewProjection.model = modelMat;
-    }
-    */
-
-    Q_ASSERT(m_pDeviceFunctions != nullptr);
+    Q_ASSERT(m_pDeviceFunctions != VK_NULL_HANDLE);
 
     // GET NEXT IMAGE
     // Wait for give fence to signal (open) from last draw before continuing
@@ -285,7 +225,9 @@ void VulkanRenderer::draw(const std::vector<Node>& iNodes, const size_t iDrawabl
     auto* vkAcquireNextImageKHR = (PFN_vkAcquireNextImageKHR)m_vulkanInstance.getInstanceProcAddr("vkAcquireNextImageKHR");
     Q_ASSERT(vkAcquireNextImageKHR != nullptr);
 
-    vkAcquireNextImageKHR(m_logicalDevice, m_swapchain, std::numeric_limits<uint64_t>::max(), m_imagesAvailable[m_currentFrame], VK_NULL_HANDLE, &imageIndex);
+    VkSwapchainKHR swapchain = m_pSwapchain->getSwapchain();
+
+    vkAcquireNextImageKHR(m_logicalDevice, swapchain, std::numeric_limits<uint64_t>::max(), m_imagesAvailable[m_currentFrame], VK_NULL_HANDLE, &imageIndex);
 
     // Update Uniform buffers
     recordCommands(imageIndex, iNodes, iDrawableNodeCount);
@@ -319,7 +261,7 @@ void VulkanRenderer::draw(const std::vector<Node>& iNodes, const size_t iDrawabl
         presentInfo.waitSemaphoreCount = 1;
         presentInfo.pWaitSemaphores = &m_renderFinished[imageIndex];
         presentInfo.swapchainCount = 1;
-        presentInfo.pSwapchains = &m_swapchain;
+        presentInfo.pSwapchains = &swapchain;
         presentInfo.pImageIndices = &imageIndex;
 
         // Present rendered image to screen
@@ -338,18 +280,23 @@ void VulkanRenderer::draw(const std::vector<Node>& iNodes, const size_t iDrawabl
 
 void VulkanRenderer::createNodes(const uint32_t iMaxRowSize, const uint32_t iMaxColumnSize, const glm::vec3 iColor, std::vector<Node>& oNodes)
 {
-    waitDeviceIdle();
+    Q_ASSERT(m_pDeviceFunctions != VK_NULL_HANDLE);
+
+    // Wait until Idle status
+    m_pDeviceFunctions->vkDeviceWaitIdle(m_logicalDevice);
 
     oNodes.clear();
 
-    const float rectangleWidth = m_extent.width / static_cast<float>(iMaxColumnSize);
-    const float rectangleHeight = m_extent.height / static_cast<float>(iMaxRowSize);
+    const VkExtent2D extent = m_pSwapchain->getExtent();
+
+    const float rectangleWidth = extent.width / static_cast<float>(iMaxColumnSize);
+    const float rectangleHeight = extent.height / static_cast<float>(iMaxRowSize);
 
     const float normalizedRectangleHalfWidth = 1.f / static_cast<float>(iMaxColumnSize);
     const float normalizedRectangleHalfHeight = 1.f / static_cast<float>(iMaxRowSize);
 
-    float halfWidth = 0.5f * m_extent.width;
-    float halfHeight = 0.5f * m_extent.height;
+    float halfWidth = 0.5f * extent.width;
+    float halfHeight = 0.5f * extent.height;
 
     for (size_t i = 0; i < iMaxRowSize; ++i) {
         for (size_t j = 0; j < iMaxColumnSize; ++j) {
@@ -368,14 +315,6 @@ void VulkanRenderer::createNodes(const uint32_t iMaxRowSize, const uint32_t iMax
 
     // Create Instance buffers
     createInstanceBuffers(maxSize);
-}
-
-void VulkanRenderer::waitDeviceIdle()
-{
-    Q_ASSERT(m_pDeviceFunctions != nullptr);
-
-    // Wait until Idle status
-    m_pDeviceFunctions->vkDeviceWaitIdle(m_logicalDevice);
 }
 
 
@@ -422,69 +361,6 @@ void VulkanRenderer::createVertexBuffer(const std::array<Vertex, 4>& iVertices,V
     destroyBufferMemory(stagingBufferMemory);
 }
 
-void VulkanRenderer::createIndexBuffer(const std::array<uint32_t, 6>& iIndices, VkBuffer& oBuffer, VkDeviceMemory& oBufferMemory)
-{
-    Q_ASSERT(m_pDeviceFunctions != nullptr);
-
-    const VkDeviceSize bufferSize = sizeof(uint32_t) * iIndices.size();
-
-    // Temporary buffer to "stage" index data before transferring to GPU
-    VkBuffer stagingBuffer{VK_NULL_HANDLE};
-    VkDeviceMemory stagingBufferMemory{VK_NULL_HANDLE};
-
-    // Create Buffer and Allocate memory
-    createBuffer(m_physicalDevice,
-                 m_logicalDevice,
-                 bufferSize,
-                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                 stagingBuffer,
-                 stagingBufferMemory);
-
-    // Map memory to index buffer (CPU is writing to the mapping process)
-    void* pData = nullptr;                                                                                // 1. Cretae pointer  to a pointer in normal memory
-    m_pDeviceFunctions->vkMapMemory(m_logicalDevice, stagingBufferMemory, 0, bufferSize, 0, &pData);      // 2. Map the index buffer memory to the pointer
-    memcpy(pData, iIndices.data(), static_cast<size_t>(bufferSize));                                      // 3. Copy memory from vertices vector to the pointer
-    m_pDeviceFunctions->vkUnmapMemory(m_logicalDevice, stagingBufferMemory);                              // 4. Unmap the index buffer memory
-
-    // Create buffer with TRANSFER_DST_BIT to mark as recipient of transfer data (also VERTEX_BUFFER)
-    // Buffer memory is to be DEVICE_LOCAL_BIT meaning memory is on the GPU and only accessible by it  and not CPU (host)
-    createBuffer(m_physicalDevice,
-                 m_logicalDevice,
-                 bufferSize,
-                 VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, // Only visible to GPU
-                 oBuffer,
-                 oBufferMemory);
-
-    // Copy stagaing bufeer to vertex buffer on GPU
-    copyBuffer(bufferSize, stagingBuffer, oBuffer);
-
-    // Clean up staging buffer parts
-    destroyBuffer(stagingBuffer);
-    destroyBufferMemory(stagingBufferMemory);
-}
-
-void VulkanRenderer::destroyBuffer(VkBuffer& ioBuffer)
-{
-    Q_ASSERT(m_pDeviceFunctions != nullptr);
-
-    if (ioBuffer != VK_NULL_HANDLE) {
-        m_pDeviceFunctions->vkDestroyBuffer(m_logicalDevice, ioBuffer, nullptr);
-        ioBuffer = VK_NULL_HANDLE;
-    }
-}
-
-void VulkanRenderer::destroyBufferMemory(VkDeviceMemory& ioBufferMemory)
-{
-    Q_ASSERT(m_pDeviceFunctions != nullptr);
-
-    if (ioBufferMemory != VK_NULL_HANDLE) {
-        m_pDeviceFunctions->vkFreeMemory(m_logicalDevice, ioBufferMemory, nullptr);
-        ioBufferMemory = VK_NULL_HANDLE;
-    }
-}
-
 void VulkanRenderer::createInstance()
 {
     printDebugInfo("Create Instance");
@@ -504,7 +380,7 @@ void VulkanRenderer::createInstance()
 
     printVulkanInfo("Vulkan api version: " + m_vulkanInstance.apiVersion().toString());
 
-    m_window->setVulkanInstance(&m_vulkanInstance);
+    m_pVulkanWidget->setVulkanInstance(&m_vulkanInstance);
 
     m_pFunctions = m_vulkanInstance.functions();
     Q_ASSERT(m_pFunctions != VK_NULL_HANDLE);
@@ -515,7 +391,7 @@ void VulkanRenderer::createSurface()
     printDebugInfo("Create Surface");
 
     // Get VkSurfaceKHR info from QWindow
-    m_surface = m_vulkanInstance.surfaceForWindow(m_window);
+    m_surface = m_vulkanInstance.surfaceForWindow(m_pVulkanWidget);
 }
 
 void VulkanRenderer::selectPhysicalDevice()
@@ -729,6 +605,19 @@ void VulkanRenderer::createLogicalDevice()
     createQueues();
 }
 
+void VulkanRenderer::createSwapchain()
+{
+    m_pSwapchain = std::make_unique<Swapchain>(m_pVulkanWidget, &m_vulkanInstance, &m_physicalDevice, &m_logicalDevice);
+    if (m_pSwapchain == nullptr) throw std::runtime_error("Failed to create a swapchain");
+
+    m_pSwapchain->createSwapchain(m_surface, m_surfaceFormat);
+}
+
+void VulkanRenderer::destroySwapchain()
+{
+    m_pSwapchain->destroySwapchain();
+}
+
 void VulkanRenderer::createQueues()
 {
     printDebugInfo("Create Queues");
@@ -811,7 +700,7 @@ void VulkanRenderer::createCommandBuffers()
     Q_ASSERT(m_pDeviceFunctions != nullptr);
 
     // Resize command buffer count to have one for each frame buffer
-    m_graphicsCommandBuffers.resize(m_swapchainImages.size());
+    m_graphicsCommandBuffers.resize(m_pSwapchain->getSwapchainImageCount());
 
     // Command buffer allocation information
     VkCommandBufferAllocateInfo commandBufferAllocateInfo{};
@@ -835,11 +724,11 @@ void VulkanRenderer::createUniformBuffers()
     VkDeviceSize modelViewProjection = sizeof(UboModelViewProjection);
 
     // Create ModelViewProjection uniform buffer for each swapchain image
-    m_uboModelViewProjectionBuffers.resize(m_swapchainImages.size());
-    m_uboModelViewProjectionBuffersMemory.resize(m_swapchainImages.size());
+    m_uboModelViewProjectionBuffers.resize(m_pSwapchain->getSwapchainImageCount());
+    m_uboModelViewProjectionBuffersMemory.resize(m_pSwapchain->getSwapchainImageCount());
 
     // Create ModelViewProjection uniform buffers
-    for (size_t i = 0; i < m_swapchainImages.size(); ++i) {
+    for (size_t i = 0; i < m_pSwapchain->getSwapchainImageCount(); ++i) {
         createBuffer(m_physicalDevice,
                     m_logicalDevice,
                     modelViewProjection,
@@ -848,6 +737,20 @@ void VulkanRenderer::createUniformBuffers()
                     m_uboModelViewProjectionBuffers[i],
                     m_uboModelViewProjectionBuffersMemory[i]);
     }
+}
+
+void VulkanRenderer::destroyUniformBuffers()
+{
+    for (size_t i = 0; i < m_uboModelViewProjectionBuffers.size(); ++i) {
+        destroyBuffer(m_uboModelViewProjectionBuffers[i]);
+    }
+
+    for (size_t i = 0; i < m_uboModelViewProjectionBuffersMemory.size(); ++i) {
+        destroyBufferMemory(m_uboModelViewProjectionBuffersMemory[i]);
+    }
+
+    m_uboModelViewProjectionBuffers.clear();
+    m_uboModelViewProjectionBuffersMemory.clear();
 }
 
 void VulkanRenderer::createBuffer(const VkPhysicalDevice iPhysicalDevice,
@@ -887,6 +790,26 @@ void VulkanRenderer::createBuffer(const VkPhysicalDevice iPhysicalDevice,
 
     // Allocate memory to given vertex buffer
     m_pDeviceFunctions->vkBindBufferMemory(m_logicalDevice, oBuffer, oBufferMemory, 0);
+}
+
+void VulkanRenderer::destroyBuffer(VkBuffer& ioBuffer)
+{
+    Q_ASSERT(m_pDeviceFunctions != nullptr);
+
+    if (ioBuffer != VK_NULL_HANDLE) {
+        m_pDeviceFunctions->vkDestroyBuffer(m_logicalDevice, ioBuffer, nullptr);
+        ioBuffer = VK_NULL_HANDLE;
+    }
+}
+
+void VulkanRenderer::destroyBufferMemory(VkDeviceMemory& ioBufferMemory)
+{
+    Q_ASSERT(m_pDeviceFunctions != nullptr);
+
+    if (ioBufferMemory != VK_NULL_HANDLE) {
+        m_pDeviceFunctions->vkFreeMemory(m_logicalDevice, ioBufferMemory, nullptr);
+        ioBufferMemory = VK_NULL_HANDLE;
+    }
 }
 
 const uint32_t VulkanRenderer::findMemoryTypeIndex(const VkPhysicalDevice iPhysicalDevice, const uint32_t allowdedTypes, const VkMemoryPropertyFlags properties)
@@ -957,13 +880,21 @@ void VulkanRenderer::createDescriptorPool()
     // Descriptor pool creation information
     VkDescriptorPoolCreateInfo modelViewProjectionDescriptorPoolCreateInfo{};
     modelViewProjectionDescriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;              // Type of the structures
-    modelViewProjectionDescriptorPoolCreateInfo.maxSets = static_cast<uint32_t>(m_swapchainImages.size());          // Maximum number of descriptor sets that can be allocated from pool
+    modelViewProjectionDescriptorPoolCreateInfo.maxSets = static_cast<uint32_t>(m_pSwapchain->getSwapchainImageCount());          // Maximum number of descriptor sets that can be allocated from pool
     modelViewProjectionDescriptorPoolCreateInfo.poolSizeCount = static_cast<uint32_t>(descriptorPoolSizes.size());  // Amount of pool sizes being passed
     modelViewProjectionDescriptorPoolCreateInfo.pPoolSizes = descriptorPoolSizes.data();                            // Pool sizes to create pool with
 
     // Create Descriptor pool
     VkResult result = m_pDeviceFunctions->vkCreateDescriptorPool(m_logicalDevice, &modelViewProjectionDescriptorPoolCreateInfo, nullptr, &m_descriptorPool);
     if (result != VK_SUCCESS) throw std::runtime_error("Failed to create Descriptor pool");
+}
+
+void VulkanRenderer::destroyDestriptorPool()
+{
+    if (m_descriptorPool != VK_NULL_HANDLE) {
+        m_pDeviceFunctions->vkDestroyDescriptorPool(m_logicalDevice, m_descriptorPool, nullptr);
+        m_descriptorPool = VK_NULL_HANDLE;
+    }
 }
 
 void VulkanRenderer::createDescriptorSets()
@@ -973,22 +904,22 @@ void VulkanRenderer::createDescriptorSets()
     Q_ASSERT(m_pDeviceFunctions != nullptr);
 
     // Resize descriptor sets so one for every unifrom buffer
-    m_descriptorSets.resize(m_swapchainImages.size());
+    m_descriptorSets.resize(m_pSwapchain->getSwapchainImageCount());
 
-    std::vector<VkDescriptorSetLayout> descriptorSetLayouts(m_swapchainImages.size(), m_descriptorSetLayout);
+    std::vector<VkDescriptorSetLayout> descriptorSetLayouts(m_pSwapchain->getSwapchainImageCount(), m_descriptorSetLayout);
 
     // Descriptor set allocation information
     VkDescriptorSetAllocateInfo descriptorSetAllocateinfo{};
     descriptorSetAllocateinfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     descriptorSetAllocateinfo.descriptorPool = m_descriptorPool;                                     // Pool to allocate Descriptor sets from
-    descriptorSetAllocateinfo.descriptorSetCount = static_cast<uint32_t>(m_swapchainImages.size());  // Number of descriptor sets to allocate
+    descriptorSetAllocateinfo.descriptorSetCount = static_cast<uint32_t>(m_pSwapchain->getSwapchainImageCount());  // Number of descriptor sets to allocate
     descriptorSetAllocateinfo.pSetLayouts = descriptorSetLayouts.data();                             // Layouts to use for each allocated set
 
     VkResult result = m_pDeviceFunctions->vkAllocateDescriptorSets(m_logicalDevice, &descriptorSetAllocateinfo, m_descriptorSets.data());
     if (result != VK_SUCCESS) throw std::runtime_error("Failed to create Descriptor sets");
 
     // Update descritor sets with buffer bindings
-    for (size_t i = 0; i < m_swapchainImages.size(); ++i) {
+    for (size_t i = 0; i < m_pSwapchain->getSwapchainImageCount(); ++i) {
         // UBO modelViewProejction descriptor
         VkDescriptorBufferInfo modelViewProjectionUniformBufferInfo{};
 
@@ -1038,6 +969,9 @@ void VulkanRenderer::recordCommands(const uint32_t iImageIndex, const std::vecto
 
     // RECORD COMMANDS
     {
+        std::vector<swapchainImage_t>& swapchainImages = m_pSwapchain->getSwapchainImages();
+        VkExtent2D extent = m_pSwapchain->getExtent();
+
         // Image layout transformation (UNDEFINED -> COLOR_ATTACHMENT)
         VkImageMemoryBarrier imageMemoryBarrierToRender{};
         imageMemoryBarrierToRender.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -1045,7 +979,7 @@ void VulkanRenderer::recordCommands(const uint32_t iImageIndex, const std::vecto
         imageMemoryBarrierToRender.newLayout           = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         imageMemoryBarrierToRender.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         imageMemoryBarrierToRender.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        imageMemoryBarrierToRender.image               = m_swapchainImages[iImageIndex].image;
+        imageMemoryBarrierToRender.image               = swapchainImages[iImageIndex].image;
         imageMemoryBarrierToRender.subresourceRange    = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
         imageMemoryBarrierToRender.srcAccessMask       = 0;
         imageMemoryBarrierToRender.dstAccessMask       = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
@@ -1059,7 +993,7 @@ void VulkanRenderer::recordCommands(const uint32_t iImageIndex, const std::vecto
         // Rendering attachment information for Dynamic rendering
         VkRenderingAttachmentInfo renderingAttachmentInfo{};
         renderingAttachmentInfo.sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-        renderingAttachmentInfo.imageView   = m_swapchainImages[iImageIndex].imageView;
+        renderingAttachmentInfo.imageView   = swapchainImages[iImageIndex].imageView;
         renderingAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         renderingAttachmentInfo.loadOp      = VK_ATTACHMENT_LOAD_OP_CLEAR;
         renderingAttachmentInfo.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
@@ -1068,7 +1002,7 @@ void VulkanRenderer::recordCommands(const uint32_t iImageIndex, const std::vecto
         VkRenderingInfo renderingInfo{};
         renderingInfo.sType                = VK_STRUCTURE_TYPE_RENDERING_INFO;
         renderingInfo.renderArea.offset    = {0, 0};
-        renderingInfo.renderArea.extent    = m_extent;
+        renderingInfo.renderArea.extent    = extent;
         renderingInfo.layerCount           = 1;
         renderingInfo.colorAttachmentCount = 1;
         renderingInfo.pColorAttachments    = &renderingAttachmentInfo;
@@ -1090,8 +1024,8 @@ void VulkanRenderer::recordCommands(const uint32_t iImageIndex, const std::vecto
             VkViewport viewport{};
             viewport.x        = 0.0f;
             viewport.y        = 0.0f;
-            viewport.width    = static_cast<float>(m_extent.width);
-            viewport.height   = static_cast<float>(m_extent.height);
+            viewport.width    = static_cast<float>(extent.width);
+            viewport.height   = static_cast<float>(extent.height);
             viewport.minDepth = 0.0f;
             viewport.maxDepth = 1.0f;
 
@@ -1100,7 +1034,7 @@ void VulkanRenderer::recordCommands(const uint32_t iImageIndex, const std::vecto
             // Scissor
             VkRect2D scissor{};
             scissor.offset = {0, 0};
-            scissor.extent = m_extent;
+            scissor.extent = extent;
 
             m_pDeviceFunctions->vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
@@ -1143,7 +1077,7 @@ void VulkanRenderer::recordCommands(const uint32_t iImageIndex, const std::vecto
         imageMemoryBarrierToPresent.newLayout           = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
         imageMemoryBarrierToPresent.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         imageMemoryBarrierToPresent.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        imageMemoryBarrierToPresent.image               = m_swapchainImages[iImageIndex].image;
+        imageMemoryBarrierToPresent.image               = swapchainImages[iImageIndex].image;
         imageMemoryBarrierToPresent.subresourceRange    = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
         imageMemoryBarrierToPresent.srcAccessMask       = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
         imageMemoryBarrierToPresent.dstAccessMask       = 0;
@@ -1172,86 +1106,6 @@ void VulkanRenderer::updateUniformBuffers(const uint32_t iImageIndex)
     m_pDeviceFunctions->vkMapMemory(m_logicalDevice, m_uboModelViewProjectionBuffersMemory[iImageIndex], 0, sizeof(m_uboModelViewProjection), 0, &pData);
     memcpy(pData, &m_uboModelViewProjection, sizeof(m_uboModelViewProjection));
     m_pDeviceFunctions->vkUnmapMemory(m_logicalDevice, m_uboModelViewProjectionBuffersMemory[iImageIndex]);
-}
-
-void VulkanRenderer::createSwapChain()
-{
-    printDebugInfo("Create SwapChain");
-
-    // Get SwapChainDetails so we can pick best settings
-    m_swapchainDetails = getSwapChainDetails(m_physicalDevice);
-
-    // 1. CHOOSE BEST SURFACE FORMAT
-    m_surfaceFormat = chooseBestSurfaceFormat(m_swapchainDetails.formats);
-
-    // 2. CHOOSE BEST PRESENTATION MODE
-    const VkPresentModeKHR presentMode = chooseBestPresentationMode(m_swapchainDetails.presentationModes);
-
-    // 3. CHOOSE SWAPCHAIN IMAGE RESOLUTION
-    m_extent = chooseSwapExtent(m_swapchainDetails.surfaceCapabilities);
-
-    // Number of images in Swapchain. Get 1 more than the mininum to allow triple buffering
-    uint32_t imageCount = m_swapchainDetails.surfaceCapabilities.minImageCount + 1;
-    // Clamp down the image count if higher than max
-    imageCount = std::min(imageCount, m_swapchainDetails.surfaceCapabilities.maxImageCount);
-    printDebugInfo("Number of swapchain images: " + QString::number(imageCount));
-
-    // Creation information for Swapchain
-    VkSwapchainCreateInfoKHR swapchainCreateInfo{};
-    swapchainCreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-    swapchainCreateInfo.surface = m_surface;                                                    // Swapchain surface
-    swapchainCreateInfo.imageFormat = m_surfaceFormat.format;                                   // Swapchain format
-    swapchainCreateInfo.imageColorSpace = m_surfaceFormat.colorSpace;                           // Swapchain color space
-    swapchainCreateInfo.presentMode = presentMode;                                              // Swapchain presentation mode
-    swapchainCreateInfo.imageExtent = m_extent;                                                 // Swapchain image extents
-    swapchainCreateInfo.minImageCount = imageCount;                                             // Swapchain images in swapchain
-    swapchainCreateInfo.imageArrayLayers = 1;                                                   // Number of layers for each image in chain
-    swapchainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;                       // What attachment images will be used as
-    swapchainCreateInfo.preTransform = m_swapchainDetails.surfaceCapabilities.currentTransform; // Transform to perform on sawp chain
-    swapchainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;                     // How to handle blending images with external graphics (e.g. other windows)
-    swapchainCreateInfo.clipped = VK_TRUE;                                                      // Whether to clip parts of images not in view (e.g. behin another window, off screen, etc)
-
-    /*
-    if (indices.graphicsFamily != indices.presentFamily) {
-        createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
-        createInfo.queueFamilyIndexCount = 2;
-        createInfo.pQueueFamilyIndices = queueFamilyIndices;
-    } else
-    */
-    {
-        swapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        swapchainCreateInfo.queueFamilyIndexCount = 0;
-        swapchainCreateInfo.pQueueFamilyIndices = nullptr;
-    }
-
-    // If old swap cahin been destroyed and this one replaces it, then link old one to quickly hand over responsibilities
-    swapchainCreateInfo.oldSwapchain = m_oldSwapchain;
-
-    // Create Swapchain
-    auto* vkCreateSwapchainKHR = (PFN_vkCreateSwapchainKHR)(m_vulkanInstance.getInstanceProcAddr("vkCreateSwapchainKHR"));
-    Q_ASSERT(vkCreateSwapchainKHR != nullptr);
-    VkResult result = vkCreateSwapchainKHR(m_logicalDevice, &swapchainCreateInfo, nullptr, &m_swapchain);
-    if (result != VK_SUCCESS) throw std::runtime_error("Failed to create a swapchain");
-    m_swapchainImages.clear();
-
-    uint32_t swapchainImageCount = 0;
-    auto* vkGetSwapchainImagesKHR = (PFN_vkGetSwapchainImagesKHR)(m_vulkanInstance.getInstanceProcAddr("vkGetSwapchainImagesKHR"));
-    Q_ASSERT(vkGetSwapchainImagesKHR != nullptr);
-    vkGetSwapchainImagesKHR(m_logicalDevice, m_swapchain, &swapchainImageCount, nullptr);
-    std::vector<VkImage> images(swapchainImageCount);
-    vkGetSwapchainImagesKHR(m_logicalDevice, m_swapchain, &swapchainImageCount, images.data());
-
-    m_swapchainImages.reserve(images.size());
-
-    // Create image view
-    for (const VkImage& image : images) {
-        // Store image handle
-        SwapchainImage_t swapchainImage{};
-        swapchainImage.image = image;
-        swapchainImage.imageView = createImageView(swapchainImage.image, m_surfaceFormat.format, VK_IMAGE_ASPECT_COLOR_BIT);
-
-        m_swapchainImages.push_back(swapchainImage);
-    }
 }
 
 void VulkanRenderer::createDescriptorSetLayout()
@@ -1393,20 +1247,22 @@ void VulkanRenderer::createGraphicsPipeline()
         pipelineInputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;    // Default primitive type to assemble vertices as
         pipelineInputAssemblyStateCreateInfo.primitiveRestartEnable = VK_FALSE;                 // Allow overriding of "strip" topology to start new primitives
 
+        VkExtent2D extent = m_pSwapchain->getExtent();
+
         // VIEWPORT AND SCISSOR
         // Create a viewport info struct
         VkViewport viewPort{};
         viewPort.x = 0.f;                                       // x start coordinate
         viewPort.y = 0.f;                                       // y start coordinate
-        viewPort.width = static_cast<float>(m_extent.width);    // Width of viewport
-        viewPort.height = static_cast<float>(m_extent.height);  // Height of viewport
+        viewPort.width = static_cast<float>(extent.width);    // Width of viewport
+        viewPort.height = static_cast<float>(extent.height);  // Height of viewport
         viewPort.minDepth = 0.f;                                // Min framebuffer depth
         viewPort.maxDepth = 1.f;                                // Max framebuffer depth
 
         // Create a scissor info struct
         VkRect2D scissor{};
         scissor.offset = {0, 0};    // Offset to use region from
-        scissor.extent = m_extent;  // Extent to describe region to use, starting at offset
+        scissor.extent = extent;  // Extent to describe region to use, starting at offset
 
         VkPipelineViewportStateCreateInfo pipelineViewportSateCreateInfo{};
         pipelineViewportSateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
@@ -1576,7 +1432,6 @@ void VulkanRenderer::createSynchronization()
     Q_ASSERT(m_pDeviceFunctions!= nullptr);
 
     m_imagesAvailable.resize(MAX_FRAMES_IN_FLIGHT,     VK_NULL_HANDLE);
-    m_renderFinished.resize(m_swapchainImages.size(),  VK_NULL_HANDLE);
     m_fences.resize(MAX_FRAMES_IN_FLIGHT,              VK_NULL_HANDLE);
 
     // Semaphore creation information
@@ -1600,6 +1455,70 @@ void VulkanRenderer::createSynchronization()
         }
     }
 
+    createRenderFinishedSemaphores();
+}
+
+void VulkanRenderer::recreateImageDependentResources(const size_t iMaxNodeCount)
+{
+    printDebugInfo("Recreate image dependent resoruces");
+
+    Q_ASSERT(m_pDeviceFunctions!= nullptr);
+
+    m_pDeviceFunctions->vkDeviceWaitIdle(m_logicalDevice);
+
+
+    // Destory resources
+    {
+        // RenderFinisehd Semaphores
+        for (size_t i = 0; i < m_renderFinished.size(); ++i) {
+            if (m_renderFinished[i] != VK_NULL_HANDLE) {
+                m_pDeviceFunctions->vkDestroySemaphore(m_logicalDevice, m_renderFinished[i], nullptr);
+                m_renderFinished[i] = VK_NULL_HANDLE;
+            }
+        }
+
+        // Instance buffers
+        destroyInstanceBuffers();
+
+        // Command buffers
+        if (!m_graphicsCommandBuffers.empty()) {
+            m_pDeviceFunctions->vkFreeCommandBuffers(m_logicalDevice, m_graphicsCommandPool, static_cast<uint32_t>(m_graphicsCommandBuffers.size()), m_graphicsCommandBuffers.data());
+            m_graphicsCommandBuffers.clear();
+        }
+
+        // Descriptor pool
+        destroyDestriptorPool();
+
+        // Descriptor set
+        m_descriptorSets.clear();
+
+        // UBO
+        destroyUniformBuffers();
+    }
+
+    // Recreate resources
+    {
+        createUniformBuffers();                 // sized to the new image count
+        createDescriptorPool();                 // maxSets / descriptorCount sized to the new image count
+        createDescriptorSets();                 // re-allocates sets and points them at the new UBO buffers
+        createCommandBuffers();                 // one primary command buffer per swapchain image
+        createInstanceBuffers(iMaxNodeCount);
+        createRenderFinishedSemaphores();     // Recreate RenderFinished semaphores
+    }
+}
+
+void VulkanRenderer::createRenderFinishedSemaphores()
+{
+    printDebugInfo("Create RenderedFinished sempaphores");
+
+    // Resize
+    m_renderFinished.resize(m_pSwapchain->getSwapchainImageCount(), VK_NULL_HANDLE);
+
+
+    // Semaphore re-creation information
+    VkSemaphoreCreateInfo semaphoreCreateInfo{};
+    semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
     for (size_t i = 0; i < m_renderFinished.size(); ++i) {
         if ((m_pDeviceFunctions->vkCreateSemaphore(m_logicalDevice, &semaphoreCreateInfo, nullptr, &m_renderFinished[i])) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create semamphores");
@@ -1611,6 +1530,49 @@ void VulkanRenderer::createRectangleBuffers()
 {
     createVertexBuffer(m_rectangleBuffers.m_vertices, m_rectangleBuffers.m_vertexBuffer, m_rectangleBuffers.m_vertexBufferMemory);
     createIndexBuffer(m_rectangleBuffers.m_indices, m_rectangleBuffers.m_indexBuffer, m_rectangleBuffers.m_indexBufferMemory);
+}
+
+void VulkanRenderer::createIndexBuffer(const std::array<uint32_t, 6>& iIndices, VkBuffer& oBuffer, VkDeviceMemory& oBufferMemory)
+{
+    Q_ASSERT(m_pDeviceFunctions != nullptr);
+
+    const VkDeviceSize bufferSize = sizeof(uint32_t) * iIndices.size();
+
+    // Temporary buffer to "stage" index data before transferring to GPU
+    VkBuffer stagingBuffer{VK_NULL_HANDLE};
+    VkDeviceMemory stagingBufferMemory{VK_NULL_HANDLE};
+
+    // Create Buffer and Allocate memory
+    createBuffer(m_physicalDevice,
+                 m_logicalDevice,
+                 bufferSize,
+                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 stagingBuffer,
+                 stagingBufferMemory);
+
+    // Map memory to index buffer (CPU is writing to the mapping process)
+    void* pData = nullptr;                                                                                // 1. Cretae pointer  to a pointer in normal memory
+    m_pDeviceFunctions->vkMapMemory(m_logicalDevice, stagingBufferMemory, 0, bufferSize, 0, &pData);      // 2. Map the index buffer memory to the pointer
+    memcpy(pData, iIndices.data(), static_cast<size_t>(bufferSize));                                      // 3. Copy memory from vertices vector to the pointer
+    m_pDeviceFunctions->vkUnmapMemory(m_logicalDevice, stagingBufferMemory);                              // 4. Unmap the index buffer memory
+
+    // Create buffer with TRANSFER_DST_BIT to mark as recipient of transfer data (also VERTEX_BUFFER)
+    // Buffer memory is to be DEVICE_LOCAL_BIT meaning memory is on the GPU and only accessible by it  and not CPU (host)
+    createBuffer(m_physicalDevice,
+                 m_logicalDevice,
+                 bufferSize,
+                 VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, // Only visible to GPU
+                 oBuffer,
+                 oBufferMemory);
+
+    // Copy stagaing bufeer to vertex buffer on GPU
+    copyBuffer(bufferSize, stagingBuffer, oBuffer);
+
+    // Clean up staging buffer parts
+    destroyBuffer(stagingBuffer);
+    destroyBufferMemory(stagingBufferMemory);
 }
 
 void VulkanRenderer::destroyRectangleBuffers()
@@ -1633,11 +1595,11 @@ void VulkanRenderer::createInstanceBuffers(const size_t iMaxNodeCount)
     const VkDeviceSize instanceSize = sizeof(instanceData_t) * iMaxNodeCount;
 
     // Create Instance buffer for each swapchain
-    m_instanceBuffers.resize(m_swapchainImages.size(), VK_NULL_HANDLE);
-    m_instanceBufferMemories.resize(m_swapchainImages.size(), VK_NULL_HANDLE);
+    m_instanceBuffers.resize(m_pSwapchain->getSwapchainImageCount(), VK_NULL_HANDLE);
+    m_instanceBufferMemories.resize(m_pSwapchain->getSwapchainImageCount(), VK_NULL_HANDLE);
 
     // Create instance buffers
-    for (size_t i = 0; i < m_swapchainImages.size(); ++i) {
+    for (size_t i = 0; i < m_pSwapchain->getSwapchainImageCount(); ++i) {
         createBuffer(m_physicalDevice,
                      m_logicalDevice,
                      instanceSize,
@@ -1689,12 +1651,12 @@ void VulkanRenderer::updateInstanceBuffers(const std::vector<Node> &iNodes, cons
 
 void VulkanRenderer::printVulkanInfo(const QString &iString) const
 {
-    emit m_window->sendVulkanInfo(iString);
+    emit m_pVulkanWidget->sendVulkanInfo(iString);
 }
 
 void VulkanRenderer::printDebugInfo(const QString &iString) const
 {
-    emit m_window->sendDebugInfo(iString);
+    emit m_pVulkanWidget->sendDebugInfo(iString);
 }
 
 const uint32_t VulkanRenderer::getQueueFamilyIndex(const VkQueueFlags iQueueFlags) const
@@ -1727,154 +1689,6 @@ const uint32_t VulkanRenderer::getQueueFamilyIndex(const VkQueueFlags iQueueFlag
     printDebugInfo("Couldn't find a queue family that supports the requested queue flags: " + QString::number(iQueueFlags));
 
     return -1;
-}
-
-const SwapChainDetails_t VulkanRenderer::getSwapChainDetails(const VkPhysicalDevice &iDevice)
-{
-    printDebugInfo("Get Swapchain Details");
-
-    SwapChainDetails_t swapchainDetails{};
-
-    // CAPABILITIES
-    // Get the surface capabilities for the given surface on the given physical device
-    auto* vkGetPhysicalDeviceSurfaceCapabilitiesKHR = (PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR)(m_vulkanInstance.getInstanceProcAddr("vkGetPhysicalDeviceSurfaceCapabilitiesKHR"));
-    Q_ASSERT(vkGetPhysicalDeviceSurfaceCapabilitiesKHR != nullptr);
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_physicalDevice, m_surface, &swapchainDetails.surfaceCapabilities);
-
-    // FORMATS
-    uint32_t formatCount = 0;
-    auto* vkGetPhysicalDeviceSurfaceFormatsKHR = (PFN_vkGetPhysicalDeviceSurfaceFormatsKHR)(m_vulkanInstance.getInstanceProcAddr("vkGetPhysicalDeviceSurfaceFormatsKHR"));
-    Q_ASSERT(vkGetPhysicalDeviceSurfaceFormatsKHR != nullptr);
-    vkGetPhysicalDeviceSurfaceFormatsKHR(m_physicalDevice, m_surface, &formatCount, nullptr);
-    if (formatCount != 0) {
-        swapchainDetails.formats.resize(formatCount);
-        vkGetPhysicalDeviceSurfaceFormatsKHR(m_physicalDevice, m_surface, &formatCount, swapchainDetails.formats.data());
-    }
-
-    // PRESENTATION MODES
-    uint32_t presentationCount = 0;
-    auto* vkGetPhysicalDeviceSurfacePresentModesKHR = (PFN_vkGetPhysicalDeviceSurfacePresentModesKHR)(m_vulkanInstance.getInstanceProcAddr("vkGetPhysicalDeviceSurfacePresentModesKHR"));
-    Q_ASSERT(vkGetPhysicalDeviceSurfacePresentModesKHR != nullptr);
-    vkGetPhysicalDeviceSurfacePresentModesKHR(m_physicalDevice, m_surface, &presentationCount, nullptr);
-
-    // if presentation modees returned, get list of presentation modes
-    if (presentationCount != 0) {
-        swapchainDetails.presentationModes.resize(presentationCount);
-        vkGetPhysicalDeviceSurfacePresentModesKHR(m_physicalDevice, m_surface, &presentationCount, swapchainDetails.presentationModes.data());
-    }
-
-    return swapchainDetails;
-}
-
-const VkSurfaceFormatKHR VulkanRenderer::chooseBestSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& iFormats)
-{
-    // Best format is subjective, but ours will be:
-    // Format    : VK_FORMAT_R8G8B8A8_UNORM (VK_FORMAT_B8G8R8A8_UNORM as backup)
-    // ColorSpace: VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
-
-    printDebugInfo("Choose best surface format");
-
-    Q_ASSERT(iFormats.size() > 0);
-
-    // If only 1 format available and is undefined, then this means ALL formats are available (no restrictions)
-    if (iFormats.size() == 1 && iFormats[0].format == VK_FORMAT_UNDEFINED) {
-        return {VK_FORMAT_R8G8B8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
-    }
-
-    for (const VkSurfaceFormatKHR& format : iFormats) {
-        if ((format.format == VK_FORMAT_R8G8B8A8_UNORM || format.format == VK_FORMAT_B8G8R8A8_UNORM) &&
-            (format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)) {
-            return format;
-        }
-    }
-
-    // If can't find optimal format, then just return the first format
-    return iFormats[0];
-}
-
-const VkPresentModeKHR VulkanRenderer::chooseBestPresentationMode(const std::vector<VkPresentModeKHR>& iPresentationModes)
-{
-    printDebugInfo("Choose best presentaion mode");
-
-    // Look for Mailbox presentation mode
-    for (const VkPresentModeKHR& presentationMode : iPresentationModes) {
-        if (presentationMode == VK_PRESENT_MODE_MAILBOX_KHR) {
-            return presentationMode;
-        }
-    }
-
-    // If can't find Mailbox, use FIFO as Vulkan spec says it must be present;
-    return VK_PRESENT_MODE_FIFO_KHR;
-}
-
-const VkExtent2D VulkanRenderer::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& iSurfaceCapabilities)
-{
-    printDebugInfo("Choose Swap Extent");
-
-    // If current extent is at numeric limits, then extent can vary. Otherwise, it's the size of the window.
-    if (iSurfaceCapabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
-        printDebugInfo("Extent width: " + QString::number(iSurfaceCapabilities.currentExtent.width));
-        printDebugInfo("Extent height: " + QString::number(iSurfaceCapabilities.currentExtent.height));
-        return iSurfaceCapabilities.currentExtent;
-    }
-
-    uint32_t width = static_cast<uint32_t>(m_window->width());
-    uint32_t height = static_cast<uint32_t>(m_window->height());
-
-    // Create new extent using window size
-    VkExtent2D newExtent{};
-
-    // Surface also defines max and min, so make sure within boundaries by clamping value
-    newExtent.width = std::max(iSurfaceCapabilities.minImageExtent.width, std::min(iSurfaceCapabilities.maxImageExtent.width, width));
-    newExtent.height = std::max(iSurfaceCapabilities.minImageExtent.height, std::min(iSurfaceCapabilities.maxImageExtent.height, height));
-
-    printDebugInfo("Extent width: " + QString::number(newExtent.width));
-    printDebugInfo("Extent height: " + QString::number(newExtent.height));
-
-    return newExtent;
-}
-
-const VkImageView VulkanRenderer::createImageView(const VkImage iImage, const VkFormat iFormat, const VkImageAspectFlags iAspectFlags)
-{
-    VkImageViewCreateInfo imageViewCreateInfo{};
-    imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    imageViewCreateInfo.image = iImage;                                          // Image to vreate view for
-    imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;                        // Type of image (1D, 2D, 3D, Cube, etc)
-    imageViewCreateInfo.format = iFormat;                                        // Format of image data
-    imageViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;            // Allows remapping of rgba components to other rgba values
-    imageViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-    imageViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-    imageViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-
-    // Sub-resources allow the view to view only a part of an image
-    imageViewCreateInfo.subresourceRange.aspectMask = iAspectFlags;              // Which aspect of image to view (e.g. COLOR_BIT for viewing color)
-    imageViewCreateInfo.subresourceRange.baseMipLevel = 0;                       // Start mipmap level to view from
-    imageViewCreateInfo.subresourceRange.levelCount = 1;                         // Number of mipmap levels to view
-    imageViewCreateInfo.subresourceRange.baseArrayLayer = 0;                     // Start array level to view from
-    imageViewCreateInfo.subresourceRange.layerCount = 1;                         // Number of array levels to view
-
-    // Create image view and return it
-    VkImageView imageView{};
-    Q_ASSERT(m_pDeviceFunctions != nullptr);
-    VkResult result = m_pDeviceFunctions->vkCreateImageView(m_logicalDevice, &imageViewCreateInfo, nullptr, &imageView);
-    if (result != VK_SUCCESS) throw std::runtime_error("Failed to create Image view");
-
-    return imageView;
-}
-
-void VulkanRenderer::destroySwapChainResources()
-{
-    Q_ASSERT(m_pDeviceFunctions != nullptr);
-
-    // Destroy the old swapchain
-    for (size_t i = 0; i < m_swapchainImages.size(); ++i) {
-        if (m_swapchainImages[i].imageView != VK_NULL_HANDLE) {
-            m_pDeviceFunctions->vkDestroyImageView(m_logicalDevice, m_swapchainImages[i].imageView, nullptr);
-            m_swapchainImages[i].imageView = VK_NULL_HANDLE;
-        }
-    }
-
-    m_swapchainImages.clear();
 }
 
 void VulkanRenderer::copyBuffer(const VkDeviceSize iBufferSize, VkBuffer &iSrcBuffer, VkBuffer &iDstBuffer)

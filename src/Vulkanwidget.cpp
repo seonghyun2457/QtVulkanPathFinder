@@ -76,6 +76,8 @@ void VulkanWidget::setSelectedNodeStatus(const eNodeStatus iNodeStatus)
 
 void VulkanWidget::solve()
 {
+    m_isWindowBlocked = true;
+
     bool solutionFound = false;
 
     sendDebugInfo(QString("Solve TSP problem. Solving algorithm: %1. Screen is blocked.").arg(static_cast<int>(m_solver)));
@@ -138,8 +140,6 @@ void VulkanWidget::solve()
     }
 
     QMessageBox::information(nullptr, "", "Solution found!");
-
-    m_isWindowBlocked = true;
 }
 
 void VulkanWidget::setRowSize(const uint32_t iRowSize)
@@ -246,7 +246,7 @@ bool VulkanWidget::event(QEvent* e)
 void VulkanWidget::resizeEvent(QResizeEvent* event)
 {
     if (m_initisialized && m_pVulkanRenderer != nullptr) {
-        m_pVulkanRenderer->recreateSwapChain();
+        m_pVulkanRenderer->recreateSwapchain(m_maxRowSize, m_maxColumnSize);
     }
 
     QWindow::resizeEvent(event);

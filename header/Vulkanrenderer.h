@@ -6,23 +6,12 @@
 
 #include <glm/glm.hpp>
 
-
+#include "Swapchain.h"
 #include "Rectangle.h"
 #include "Node.h"
 
 class VulkanWidget;
 
-typedef struct SwapChainDetails {
-    VkSurfaceCapabilitiesKHR surfaceCapabilities;     // Surface properties, e.g. image size/extent
-    std::vector<VkSurfaceFormatKHR> formats;          // Surface image formats, e.g. RGBA and size of each color
-    std::vector<VkPresentModeKHR> presentationModes;   // How images should be presented to screen
-} SwapChainDetails_t;
-
-
-typedef struct SwapchainImage {
-    VkImage image{VK_NULL_HANDLE};
-    VkImageView imageView{VK_NULL_HANDLE};
-} SwapchainImage_t;
 
 typedef struct {
     glm::vec4 rect{glm::vec4(0.f, 0.f, 0.f, 0.f)};   // xy = center (NDC), zw = half-size (NDC)
@@ -38,23 +27,17 @@ class VulkanRenderer
 {
 
 public:
-    VulkanRenderer(VulkanWidget* vulkanWindow);
+    VulkanRenderer(VulkanWidget* ipVulkanWidget);
     virtual ~VulkanRenderer();
 
     bool initialize();
     void cleanup();
 
-    void recreateSwapChain();
+    void recreateSwapchain(const uint32_t iMaxRowSize, const uint32_t iMaxColumnSize);
 
     void draw(const std::vector<Node>& iNodes, const size_t iDrawableNodeCount);
 
     void createNodes(const uint32_t iMaxRowSize, const uint32_t iMaxColumnSize, const glm::vec3 iColor, std::vector<Node>& oNodes);
-    void waitDeviceIdle();
-
-    void createVertexBuffer(const std::array<Vertex, 4>& iVertices, VkBuffer& oBuffer, VkDeviceMemory& oBufferMemory);
-    void createIndexBuffer(const std::array<uint32_t, 6>& iIndices, VkBuffer& oBuffer, VkDeviceMemory& oBufferMemory);
-    void destroyBuffer(VkBuffer& ioBuffer);
-    void destroyBufferMemory(VkDeviceMemory& ioBufferMemory);
 
     // Read GPU spent time for previous frame
     float readGPUFrameTime();
@@ -66,8 +49,9 @@ private:
     // Before graphics pipeline
     void selectPhysicalDevice();
     void createLogicalDevice();
+    void createSwapchain();
+    void destroySwapchain();
     void createQueues();
-    void createSwapChain();
     void createDescriptorSetLayout();
     void createPushConstantRange();
     void createGraphicsPipeline();
@@ -79,7 +63,9 @@ private:
     VkCommandPool createCommandPool(const uint32_t iQueueFamilyIndex);
     void createCommandBuffers();
     void createUniformBuffers();
+    void destroyUniformBuffers();
     void createDescriptorPool();
+    void destroyDestriptorPool();
     void createDescriptorSets();
 
     void recordCommands(const uint32_t iImageIndex, const std::vector<Node>& iNodes, const size_t iDrawableNodeCount);
@@ -87,9 +73,15 @@ private:
 
     // Synchronization
     void createSynchronization();
+    void createRenderFinishedSemaphores();
+
+    // recreate image dependent resources after swapchain recreation
+    void recreateImageDependentResources(const size_t iMaxNodeCount);
 
     // Rectangle buffer
     void createRectangleBuffers();
+    void createVertexBuffer(const std::array<Vertex, 4>& iVertices, VkBuffer& oBuffer, VkDeviceMemory& oBufferMemory);
+    void createIndexBuffer(const std::array<uint32_t, 6>& iIndices, VkBuffer& oBuffer, VkDeviceMemory& oBufferMemory);
     void destroyRectangleBuffers();
 
     // Instnace Buffers
@@ -104,14 +96,6 @@ private:
     // Queue Family methods
     const uint32_t getQueueFamilyIndex(const VkQueueFlags iQueueFlags) const;
 
-    // SwapChain methods
-    const SwapChainDetails_t getSwapChainDetails(const VkPhysicalDevice& iDevice);
-    const VkSurfaceFormatKHR chooseBestSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& iFormats);
-    const VkPresentModeKHR chooseBestPresentationMode(const std::vector<VkPresentModeKHR>& iPresentationModes);
-    const VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& iSurfaceCapabilities);
-    const VkImageView createImageView(const VkImage iImage, const VkFormat iFormat, const VkImageAspectFlags iAspectFlags);
-    void destroySwapChainResources();
-
     // Buffer methods
     void copyBuffer(const VkDeviceSize iBufferSize, VkBuffer& iSrcBuffer, VkBuffer& iDstBuffer);
     void createBuffer(const VkPhysicalDevice iPhysicalDevice,
@@ -121,6 +105,8 @@ private:
                       const VkMemoryPropertyFlags iBufferProperties,
                       VkBuffer& oBuffer,
                       VkDeviceMemory& oBufferMemory);
+    void destroyBuffer(VkBuffer& ioBuffer);
+    void destroyBufferMemory(VkDeviceMemory& ioBufferMemory);
     const uint32_t findMemoryTypeIndex(const VkPhysicalDevice iPhysicalDevice, const uint32_t allowdedTypes, const VkMemoryPropertyFlags properties);
 
     // Read GPU spent time for iFrameIndex
@@ -129,8 +115,8 @@ private:
     // Extension functions
     bool extensionSupported(const char* iExtension) const;
 private:
-    // Window
-    VulkanWidget* m_window{nullptr};
+    // Vulkan Widget
+    VulkanWidget* m_pVulkanWidget{nullptr};
 
     struct UboModelViewProjection {
         glm::mat4 model;
@@ -147,11 +133,7 @@ private:
     VkSurfaceFormatKHR m_surfaceFormat{};
 
     // - SwapChain
-    VkSwapchainKHR m_swapchain{VK_NULL_HANDLE};
-    VkSwapchainKHR m_oldSwapchain{VK_NULL_HANDLE};
-    SwapChainDetails_t m_swapchainDetails;
-    std::vector<SwapchainImage_t> m_swapchainImages;
-    VkExtent2D m_extent{};
+    std::unique_ptr<Swapchain> m_pSwapchain;
 
     // - Devices
     // -- Physical Deivce
